@@ -125,6 +125,7 @@ public final class Car {
 		}
 	}
 
+	// (x-x1)/(x2-x1) = (y-y1)/(y2-y1) => ax+by+c=0
 	private static Map<String, Double> lineEquation(Point p1, Point p2) {
 		double xDiff = p2.getX() - p1.getX();
 		double yDiff = p2.getY() - p1.getY();

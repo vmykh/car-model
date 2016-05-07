@@ -11,8 +11,12 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
+import javafx.stage.WindowEvent;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -31,6 +35,8 @@ public class Main extends Application {
 			.setInitialPosition(250, 250)
 			.setInitialOrientation(PI / 2)
 			.setInitialFrontAxisAngle(-0.3);
+
+	private List<Point> previousPositions = new ArrayList<>();
 
 	private Timer timer = new Timer();
 
@@ -98,6 +104,13 @@ public class Main extends Application {
 		stage.setTitle("Lines");
 		stage.setScene(scene);
 		stage.show();
+		stage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+			@Override
+			public void handle(WindowEvent event) {
+				Platform.exit();
+				System.exit(0);
+			}
+		});
 
 	}
 
@@ -108,6 +121,14 @@ public class Main extends Application {
 				Platform.runLater(new Runnable() {
 					@Override
 					public void run() {
+						Point currentPos = new Point(car.getX(), car.getY());
+
+						if (previousPositions.isEmpty()) {
+							previousPositions.add(currentPos);
+						} else if (!previousPositions.get(previousPositions.size() - 1).equals(currentPos)) {
+							previousPositions.add(currentPos);
+						}
+
 						if (leftKeyIsPressed) {
 							car.setFrontAxisAngle(PI / 8.0);
 						} else if (rightKeyIsPressed) {
@@ -117,17 +138,24 @@ public class Main extends Application {
 						}
 
 						if (upKeyIsPressed) {
-							car.moveForward(3);
+							car.moveForward(5);
 						} else if (downKeyIsPressed) {
-							car.moveForward(-3);
+							car.moveForward(-5);
 						}
 						gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+						drawTraсe(previousPositions);
 						drawCar(car);
 						timer.schedule(createTimerTask(), 25L);
 					}
 				});
 			}
 		};
+	}
+
+	private void drawTraсe(List<Point> trace) {
+		for (Point point : trace) {
+			drawCircle(point, 3, Color.DARKGREY);
+		}
 	}
 
 	private void drawCar(Car car) {
@@ -180,6 +208,13 @@ public class Main extends Application {
 
 	public void drawCircle(Point center, double radius) {
 		gc.fillOval(center.getX() - (0.5 * radius), canvas.getHeight() - (center.getY() + 0.5 * radius), radius, radius);
+	}
+
+	public void drawCircle(Point center, double radius, Color color) {
+		Paint prevFill = gc.getFill();
+		gc.setFill(color);
+		drawCircle(center, radius);
+		gc.setFill(prevFill);
 	}
 
 	public void drawAxis(Point leftWheel, Point rightWheel) {
