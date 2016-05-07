@@ -20,23 +20,23 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import static java.lang.Math.PI;
-import static java.lang.Math.cos;
-import static java.lang.Math.sin;
+import static java.lang.Math.*;
 
 public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
+	private static final double CAR_WIDTH = 45;
+	private static final double CAR_LENGTH = 60;
+
 	private GraphicsContext gc;
 	private Canvas canvas;
 	private  Car car =
-			new Car(80, 100)
+			new Car(CAR_WIDTH, CAR_LENGTH)
 			.setInitialPosition(250, 250)
-			.setInitialOrientation(PI / 2)
-			.setInitialFrontAxisAngle(-0.3);
+			.setInitialOrientation(PI / 2);
 
-	private List<Point> previousPositions = new ArrayList<>();
+	private List<Point> tracePoints = new ArrayList<>();
 
 	private Timer timer = new Timer();
 
@@ -44,6 +44,12 @@ public class Main extends Application {
 	private volatile boolean downKeyIsPressed = false;
 	private volatile boolean rightKeyIsPressed = false;
 	private volatile boolean leftKeyIsPressed = false;
+
+	private Point firstTargetPoint;
+	private Point secondTargetPoint;
+
+	private Point firstCarPoint;
+	private Point secondCarPoint;
 
 	private volatile List<Point> target;
 
@@ -91,24 +97,36 @@ public class Main extends Application {
 					} else {
 						rightKeyIsPressed = false;
 					}
+				} else if (event.getCode() == KeyCode.R) {
+					car = null;
+					target = null;
+					tracePoints.clear();
+					firstCarPoint = null;
+					secondCarPoint = null;
+					firstTargetPoint = null;
+					secondTargetPoint = null;
 				}
 			}
 		};
 
 		canvas.addEventHandler(MouseEvent.MOUSE_CLICKED,
 				new EventHandler<MouseEvent>() {
-					private Point firstPoint;
-					private Point secondPoint;
-
 					@Override
 					public void handle(MouseEvent e) {
-						if (firstPoint == null) {
-							firstPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
-							System.out.println(firstPoint);
-						} else if (secondPoint == null) {
-							secondPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
-							Vector direction = new Vector(firstPoint, secondPoint);
-							createTarget(car, firstPoint, direction);
+						if (car == null) {
+							if (firstCarPoint == null) {
+								firstCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+							} else if (secondCarPoint == null) {
+								secondCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+								car = createCar(firstCarPoint, new Vector(firstCarPoint, secondCarPoint));
+							}
+						}
+						else if (firstTargetPoint == null) {
+							firstTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+						} else if (secondTargetPoint == null) {
+							secondTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+							Vector direction = new Vector(firstTargetPoint, secondTargetPoint);
+							createTarget(car, firstTargetPoint, direction);
 						}
 					}
 				});
@@ -132,6 +150,12 @@ public class Main extends Application {
 			}
 		});
 
+	}
+
+	private static Car createCar(Point backCenterPoint, Vector direction) {
+		return new Car(CAR_WIDTH, CAR_LENGTH)
+				.setInitialPosition(backCenterPoint.add(direction.normalized().multipliedBy(CAR_LENGTH * 0.5)))
+				.setInitialOrientation(direction.getAngle());
 	}
 
 	private void createTarget(Car car, Point backCenterPosition, Vector direction) {
@@ -168,34 +192,38 @@ public class Main extends Application {
 				Platform.runLater(new Runnable() {
 					@Override
 					public void run() {
-						Point currentPos = new Point(car.getX(), car.getY());
-
-						if (previousPositions.isEmpty()) {
-							previousPositions.add(currentPos);
-						} else if (!previousPositions.get(previousPositions.size() - 1).equals(currentPos)) {
-							previousPositions.add(currentPos);
-						}
-
-						if (leftKeyIsPressed) {
-							car.setFrontAxisAngle(PI / 8.0);
-						} else if (rightKeyIsPressed) {
-							car.setFrontAxisAngle(-PI / 8.0);
+						if (car == null) {
+							gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 						} else {
-							car.setFrontAxisAngle(0.0);
-						}
+							Point currentPos = new Point(car.getX(), car.getY());
 
-						if (upKeyIsPressed) {
-							car.moveForward(5);
-						} else if (downKeyIsPressed) {
-							car.moveForward(-5);
-						}
+							if (tracePoints.isEmpty()) {
+								tracePoints.add(currentPos);
+							} else if (!tracePoints.get(tracePoints.size() - 1).equals(currentPos)) {
+								tracePoints.add(currentPos);
+							}
 
-						gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-						if (target != null) {
-							drawTarget(target);
+							if (leftKeyIsPressed) {
+								car.setFrontAxisAngle(PI / 8.0);
+							} else if (rightKeyIsPressed) {
+								car.setFrontAxisAngle(-PI / 8.0);
+							} else {
+								car.setFrontAxisAngle(0.0);
+							}
+
+							if (upKeyIsPressed) {
+								car.moveForward(5);
+							} else if (downKeyIsPressed) {
+								car.moveForward(-5);
+							}
+
+							gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+							if (target != null) {
+								drawTarget(target);
+							}
+							drawTraсe(tracePoints);
+							drawCar(car);
 						}
-						drawTraсe(previousPositions);
-						drawCar(car);
 						timer.schedule(createTimerTask(), 25L);
 					}
 				});
@@ -281,8 +309,10 @@ public class Main extends Application {
 
 		Point wheelShift = new Point(wheelXShift, wheelYShift);
 
-		drawLine(leftWheel.add(wheelShift), leftWheel.subtract(wheelShift), 10.0);
-		drawLine(rightWheel.add(wheelShift), rightWheel.subtract(wheelShift), 10.0);
+		double wheelWidth = leftWheel.distanceTo(rightWheel) * 0.15;
+
+		drawLine(leftWheel.add(wheelShift), leftWheel.subtract(wheelShift), wheelWidth);
+		drawLine(rightWheel.add(wheelShift), rightWheel.subtract(wheelShift), wheelWidth);
 	}
 
 	private void drawLine(Point p1, Point p2, double width) {

@@ -26,6 +26,12 @@ public final class Car {
 		return this;
 	}
 
+	public Car setInitialPosition(Point position) {
+		this.x = position.getX();
+		this.y = position.getY();
+		return this;
+	}
+
 	public Car setInitialOrientation(double alpha) {
 		this.orientationAngle = alpha;
 		return this;
