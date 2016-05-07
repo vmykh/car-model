@@ -183,6 +183,41 @@ public class Main extends Application {
 		drawLine(target.get(1), target.get(2), lineWidth, lineColor);
 		drawLine(target.get(2), target.get(3), lineWidth, lineColor);
 		drawLine(target.get(3), target.get(0), lineWidth, lineColor);
+
+		double width = target.get(0).distanceTo(target.get(3));
+
+		Vector targetDirection = new Vector(target.get(0), target.get(1));
+		Point arrowBase = target.get(3)
+				.add(targetDirection.perpendicular().normalized().multipliedBy(width * 0.5))
+				.add(targetDirection.multipliedBy(0.25));
+		Point arrowHead = arrowBase.add(targetDirection.multipliedBy(0.5));
+		drawArrow(arrowBase, arrowHead, lineWidth, lineColor);
+	}
+
+	private void drawArrow(Point base, Point arrowHead, double width, Color color) {
+		double length = base.distanceTo(arrowHead);
+
+		Vector direction = new Vector(base, arrowHead);
+
+		Vector arrowHeadRightPartShift =
+				direction.add(direction.perpendicular())
+						.negative()
+						.normalized()
+						.multipliedBy(length * 0.25);
+
+		Vector arrowHeadLeftPartShift =
+				direction.add(direction.perpendicular().negative())
+						.negative()
+						.normalized()
+						.multipliedBy(length * 0.25);
+
+		Point arrowHeadLeft = arrowHead.add(arrowHeadLeftPartShift);
+		Point arrowHeadRight = arrowHead.add(arrowHeadRightPartShift);
+
+
+		drawLine(base, arrowHead, width, color);
+		drawLine(arrowHead, arrowHeadLeft, width, color);
+		drawLine(arrowHead, arrowHeadRight, width, color);
 	}
 
 	private TimerTask createTimerTask() {

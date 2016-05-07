@@ -64,6 +64,10 @@ public final class Vector {
 		return new Vector(coefficient * x, coefficient * y);
 	}
 
+	public Vector add(Vector other) {
+		return new Vector(x + other.x, y + other.y);
+	}
+
 	public double crossProduct(Vector other) {
 		return this.x * other.y - other.x * this.y;
 	}
