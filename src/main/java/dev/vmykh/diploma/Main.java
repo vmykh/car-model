@@ -45,6 +45,8 @@ public class Main extends Application {
 	private volatile boolean rightKeyIsPressed = false;
 	private volatile boolean leftKeyIsPressed = false;
 
+	private volatile List<Point> target;
+
 	@Override
 	public void start(Stage stage) {
 
@@ -93,6 +95,24 @@ public class Main extends Application {
 			}
 		};
 
+		canvas.addEventHandler(MouseEvent.MOUSE_CLICKED,
+				new EventHandler<MouseEvent>() {
+					private Point firstPoint;
+					private Point secondPoint;
+
+					@Override
+					public void handle(MouseEvent e) {
+						if (firstPoint == null) {
+							firstPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+							System.out.println(firstPoint);
+						} else if (secondPoint == null) {
+							secondPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+							Vector direction = new Vector(firstPoint, secondPoint);
+							createTarget(car, firstPoint, direction);
+						}
+					}
+				});
+
 
 		timer.schedule(createTimerTask(), 0L);
 
@@ -112,6 +132,33 @@ public class Main extends Application {
 			}
 		});
 
+	}
+
+	private void createTarget(Car car, Point backCenterPosition, Vector direction) {
+		double w = car.getWidth();
+		double l = car.getLength();
+
+		Vector directionNormalized = direction.normalized();
+		Vector perpendicularDirectionNormalized = direction.perpendicular().normalized();
+		Point firstPoint = backCenterPosition.add(perpendicularDirectionNormalized.multipliedBy(w * 0.5));
+		Point secondPoint = firstPoint.add(directionNormalized.multipliedBy(l));
+		Point thirdPoint = secondPoint.add(perpendicularDirectionNormalized.negative().multipliedBy(w));
+		Point fourthPoint = thirdPoint.add(directionNormalized.negative().multipliedBy(l));
+
+		target = new ArrayList<>(4);
+		target.add(firstPoint);
+		target.add(secondPoint);
+		target.add(thirdPoint);
+		target.add(fourthPoint);
+	}
+
+	private void drawTarget(List<Point> target) {
+		double lineWidth = 3;
+		Color lineColor = Color.RED;
+		drawLine(target.get(0), target.get(1), lineWidth, lineColor);
+		drawLine(target.get(1), target.get(2), lineWidth, lineColor);
+		drawLine(target.get(2), target.get(3), lineWidth, lineColor);
+		drawLine(target.get(3), target.get(0), lineWidth, lineColor);
 	}
 
 	private TimerTask createTimerTask() {
@@ -142,7 +189,11 @@ public class Main extends Application {
 						} else if (downKeyIsPressed) {
 							car.moveForward(-5);
 						}
+
 						gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+						if (target != null) {
+							drawTarget(target);
+						}
 						drawTraсe(previousPositions);
 						drawCar(car);
 						timer.schedule(createTimerTask(), 25L);
@@ -240,6 +291,13 @@ public class Main extends Application {
 		gc.lineTo(p2.getX(), canvas.getWidth() - p2.getY());
 		gc.setLineWidth(width);
 		gc.stroke();
+	}
+
+	private void drawLine(Point p1, Point p2, double width, Color color) {
+		Paint prevStroke = gc.getStroke();
+		gc.setStroke(color);
+		drawLine(p1, p2, width);
+		gc.setStroke(prevStroke);
 	}
 
 

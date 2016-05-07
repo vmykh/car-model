@@ -48,6 +48,22 @@ public final class Vector {
 		}
 	}
 
+	public Vector negative() {
+		return new Vector(-x, -y);
+	}
+
+	public Vector normalized() {
+		return new Vector(x / getMagnitude(), y / getMagnitude());
+	}
+
+	public Vector perpendicular() {
+		return new Vector(-y, x);
+	}
+
+	public Vector multipliedBy(double coefficient) {
+		return new Vector(coefficient * x, coefficient * y);
+	}
+
 	public double crossProduct(Vector other) {
 		return this.x * other.y - other.x * this.y;
 	}
