@@ -1,12 +1,20 @@
 package dev.vmykh.diploma;
 
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.event.EventHandler;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static java.lang.Math.PI;
 import static java.lang.Math.cos;
@@ -18,6 +26,18 @@ public class Main extends Application {
 
 	private GraphicsContext gc;
 	private Canvas canvas;
+	private  Car car =
+			new Car(80, 100)
+			.setInitialPosition(250, 250)
+			.setInitialOrientation(PI / 2)
+			.setInitialFrontAxisAngle(-0.3);
+
+	private Timer timer = new Timer();
+
+	private volatile boolean upKeyIsPressed = false;
+	private volatile boolean downKeyIsPressed = false;
+	private volatile boolean rightKeyIsPressed = false;
+	private volatile boolean leftKeyIsPressed = false;
 
 	@Override
 	public void start(Stage stage) {
@@ -32,27 +52,82 @@ public class Main extends Application {
 		canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
 		gc = canvas.getGraphicsContext2D();
 
-		Car car = new Car(80, 100).setInitialPosition(250, 250).setInitialOrientation(PI / 2).setInitialFrontAxisAngle(-0.3);
-
 		drawCar(car);
-
-		car.moveForward(150);
-
-		drawCar(car);
-
-		car.moveForward(150);
-
-		drawCar(car);
-
-
 
 		root.getChildren().add(canvas);
 
+		EventHandler<KeyEvent> keyListener = new EventHandler<KeyEvent>() {
+			@Override
+			public void handle(KeyEvent event) {
+				if (event.getCode() == KeyCode.UP) {
+					if (event.getEventType() == KeyEvent.KEY_PRESSED) {
+						upKeyIsPressed = true;
+					} else {
+						upKeyIsPressed = false;
+					}
+				} else if (event.getCode() == KeyCode.DOWN) {
+					if (event.getEventType() == KeyEvent.KEY_PRESSED) {
+						downKeyIsPressed = true;
+					} else {
+						downKeyIsPressed = false;
+					}
+				} else if (event.getCode() == KeyCode.LEFT) {
+					if (event.getEventType() == KeyEvent.KEY_PRESSED) {
+						leftKeyIsPressed = true;
+					} else {
+						leftKeyIsPressed = false;
+					}
+				} else if (event.getCode() == KeyCode.RIGHT) {
+					if (event.getEventType() == KeyEvent.KEY_PRESSED) {
+						rightKeyIsPressed = true;
+					} else {
+						rightKeyIsPressed = false;
+					}
+				}
+			}
+		};
+
+
+		timer.schedule(createTimerTask(), 0L);
+
+
 		Scene scene = new Scene(root, CANVAS_WIDTH, CANVAS_HEIGHT, Color.WHITESMOKE);
+
+		stage.addEventHandler(KeyEvent.ANY, keyListener);
 
 		stage.setTitle("Lines");
 		stage.setScene(scene);
 		stage.show();
+
+	}
+
+	private TimerTask createTimerTask() {
+		return new TimerTask() {
+			@Override
+			public void run() {
+				Platform.runLater(new Runnable() {
+					@Override
+					public void run() {
+						if (leftKeyIsPressed) {
+							car.setFrontAxisAngle(PI / 8.0);
+						} else if (rightKeyIsPressed) {
+							car.setFrontAxisAngle(-PI / 8.0);
+						} else {
+							car.setFrontAxisAngle(0.0);
+						}
+
+						if (upKeyIsPressed) {
+							car.moveForward(3);
+						} else if (downKeyIsPressed) {
+							car.moveForward(-3);
+						}
+						gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+						drawCar(car);
+						timer.schedule(createTimerTask(), 25L);
+					}
+				});
+			}
+		};
 	}
 
 	private void drawCar(Car car) {
@@ -137,4 +212,6 @@ public class Main extends Application {
 	public static void main(String[] args) {
 		launch(args);
 	}
+
+
 }
