@@ -10,6 +10,6 @@ public class Temp {
 //		System.out.println(new Vector(2, 2).getAngle() / Math.PI * 180);
 		Car car = new Car(0.5, 1).setInitialPosition(0, 0.5).setInitialOrientation(PI/2).setInitialFrontAxisAngle(PI / 6.0);
 
-		car.moveForward(10);
+		car.movedBy(10);
 	}
 }

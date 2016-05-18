@@ -67,14 +67,23 @@ public final class Car {
 		return frontAxisAngle;
 	}
 
-	public void setFrontAxisAngle(double frontAxisAngle) {
-		this.frontAxisAngle = frontAxisAngle;
+	public Car withFrontAxisAngle(double frontAxisAngle) {
+		Car car = new Car(width, length);
+		car.setInitialPosition(x, y);
+		car.setInitialOrientation(orientationAngle);
+		car.setInitialFrontAxisAngle(frontAxisAngle);
+		return car;
 	}
 
-	public void moveForward(double distance) {
+	public Car movedBy(double distance) {
+		double newX;
+		double newY;
+		double newOrientationAngle;
+
 		if (abs(frontAxisAngle) < 0.0001) {
-			x += distance * cos(orientationAngle);
-			y += distance * sin(orientationAngle);
+			newX = x + distance * cos(orientationAngle);
+			newY = y + distance * sin(orientationAngle);
+			newOrientationAngle = orientationAngle;
 		} else {
 			double orientAngleShifted = orientationAngle + PI / 2;
 
@@ -125,10 +134,16 @@ public final class Car {
 			double rotationAngle = rotateCounterClockWise ? rotationAngleAbs : -rotationAngleAbs;
 			double endAngle = startAngle + rotationAngle;
 
-			x = rotationCircleCenter.getX() + rotationRadius * cos(endAngle);
-			y = rotationCircleCenter.getY() + rotationRadius * sin(endAngle);
-			orientationAngle += rotationAngle;
+			newX = rotationCircleCenter.getX() + rotationRadius * cos(endAngle);
+			newY = rotationCircleCenter.getY() + rotationRadius * sin(endAngle);
+			newOrientationAngle = orientationAngle + rotationAngle;
 		}
+
+		Car movedCar = new Car(width, length);
+		movedCar.setInitialPosition(newX, newY);
+		movedCar.setInitialOrientation(newOrientationAngle);
+		movedCar.setInitialFrontAxisAngle(frontAxisAngle);
+		return movedCar;
 	}
 
 	// (x-x1)/(x2-x1) = (y-y1)/(y2-y1) => ax+by+c=0

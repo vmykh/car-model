@@ -25,16 +25,12 @@ public final class Point {
 		return sqrt(xDiff * xDiff + yDiff * yDiff);
 	}
 
-	public Point add(Point other) {
-		return new Point(this.x + other.x, this.y + other.y);
-	}
-
 	public Point add(Vector direction) {
 		return new Point(this.x + direction.getX(), this.y + direction.getY());
 	}
 
-	public Point subtract(Point other) {
-		return new Point(this.x - other.x, this.y - other.y);
+	public Point subtract(Vector direction) {
+		return new Point(this.x - direction.getX(), this.y - direction.getY());
 	}
 
 	@Override

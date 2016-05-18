@@ -8,10 +8,12 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
@@ -26,12 +28,12 @@ public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
-	private static final double CAR_WIDTH = 45;
-	private static final double CAR_LENGTH = 60;
+	private static final double CAR_WIDTH = 30;
+	private static final double CAR_LENGTH = 45;
 
 	private GraphicsContext gc;
 	private Canvas canvas;
-	private  Car car =
+	private volatile Car car =
 			new Car(CAR_WIDTH, CAR_LENGTH)
 			.setInitialPosition(250, 250)
 			.setInitialOrientation(PI / 2);
@@ -52,6 +54,15 @@ public class Main extends Application {
 	private Point secondCarPoint;
 
 	private volatile List<Point> target;
+
+	private List<Obstacle> obstacles = new ArrayList();
+
+	private static final int POINTS_PER_CAR_SIDE = 8;
+
+	// TODO(vmykh): remove this bullshit
+	{
+		obstacles.add(new Obstacle(new Point(200, 350), 50, 50));
+	}
 
 	@Override
 	public void start(Stage stage) {
@@ -101,6 +112,7 @@ public class Main extends Application {
 					car = null;
 					target = null;
 					tracePoints.clear();
+					obstacles.clear();
 					firstCarPoint = null;
 					secondCarPoint = null;
 					firstTargetPoint = null;
@@ -113,20 +125,24 @@ public class Main extends Application {
 				new EventHandler<MouseEvent>() {
 					@Override
 					public void handle(MouseEvent e) {
-						if (car == null) {
-							if (firstCarPoint == null) {
-								firstCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
-							} else if (secondCarPoint == null) {
-								secondCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
-								car = createCar(firstCarPoint, new Vector(firstCarPoint, secondCarPoint));
+						if (e.getButton() == MouseButton.PRIMARY) {
+							if (car == null) {
+								if (firstCarPoint == null) {
+									firstCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+								} else if (secondCarPoint == null) {
+									secondCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+									car = createCar(firstCarPoint, new Vector(firstCarPoint, secondCarPoint));
+								}
 							}
-						}
-						else if (firstTargetPoint == null) {
-							firstTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
-						} else if (secondTargetPoint == null) {
-							secondTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
-							Vector direction = new Vector(firstTargetPoint, secondTargetPoint);
-							createTarget(car, firstTargetPoint, direction);
+							else if (firstTargetPoint == null) {
+								firstTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+							} else if (secondTargetPoint == null) {
+								secondTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+								Vector direction = new Vector(firstTargetPoint, secondTargetPoint);
+								createTarget(car, firstTargetPoint, direction);
+							}
+						} else if (e.getButton() == MouseButton.SECONDARY) {
+							obstacles.add(new Obstacle(new Point(e.getX(), canvas.getHeight() - e.getY()), 50, 50));
 						}
 					}
 				});
@@ -194,6 +210,13 @@ public class Main extends Application {
 		drawArrow(arrowBase, arrowHead, lineWidth, lineColor);
 	}
 
+	private void drawObstacle(Obstacle obstacle) {
+		Color color = Color.DARKBLUE;
+		Vector fromCenterToLeftBottom = new Vector(obstacle.getWidth() / 2.0, obstacle.getHeight() / 2.0).negative();
+		Point leftBottom = obstacle.getCenter().add(fromCenterToLeftBottom);
+		fillRect(leftBottom.getX(), leftBottom.getY(), obstacle.getWidth(), obstacle.getHeight(), color);
+	}
+
 	private void drawArrow(Point base, Point arrowHead, double width, Color color) {
 		double length = base.distanceTo(arrowHead);
 
@@ -238,18 +261,23 @@ public class Main extends Application {
 								tracePoints.add(currentPos);
 							}
 
+							Car newCar;
 							if (leftKeyIsPressed) {
-								car.setFrontAxisAngle(PI / 8.0);
+								newCar = car.withFrontAxisAngle(PI / 8.0);
 							} else if (rightKeyIsPressed) {
-								car.setFrontAxisAngle(-PI / 8.0);
+								newCar = car.withFrontAxisAngle(-PI / 8.0);
 							} else {
-								car.setFrontAxisAngle(0.0);
+								newCar = car.withFrontAxisAngle(0.0);
 							}
 
 							if (upKeyIsPressed) {
-								car.moveForward(5);
+								newCar = newCar.movedBy(5);
 							} else if (downKeyIsPressed) {
-								car.moveForward(-5);
+								newCar = newCar.movedBy(-5);
+							}
+
+							if (!carOverlapsWithObstacles(newCar)) {
+								car = newCar;
 							}
 
 							gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -258,12 +286,63 @@ public class Main extends Application {
 							}
 							drawTraсe(tracePoints);
 							drawCar(car);
+							drawTotalDistance(tracePoints);
+
+							for (Obstacle obstacle : obstacles) {
+								drawObstacle(obstacle);
+							}
 						}
 						timer.schedule(createTimerTask(), 25L);
 					}
 				});
 			}
 		};
+	}
+
+	private boolean carOverlapsWithObstacles(Car car) {
+		for (Obstacle obstacle : obstacles) {
+			List<Point> carSidePoints = generateCarSidePoints(car);
+			for (Point carSidePoint : carSidePoints) {
+				if (obstacle.contains(carSidePoint)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private List<Point> generateCarSidePoints(Car car) {
+		Vector fromRearToFront = new Vector(car.getBackAxisCenter(), car.getFrontAxisCenter());
+		Vector fromRightWheelToLeftWheel = fromRearToFront.perpendicular().normalized().multipliedBy(car.getWidth());
+
+		Point rearLeft = car.getBackAxisCenter().add(fromRightWheelToLeftWheel.multipliedBy(0.5));
+		Point frontLeft = rearLeft.add(fromRearToFront);
+		Point frontRight = frontLeft.add(fromRightWheelToLeftWheel.negative());
+		Point rearRight = rearLeft.add(fromRightWheelToLeftWheel.negative());
+
+		List<Point> carSidePoints = new ArrayList<>(POINTS_PER_CAR_SIDE * 4);
+		carSidePoints.addAll(pointsBetween(rearLeft, frontLeft, POINTS_PER_CAR_SIDE));
+		carSidePoints.addAll(pointsBetween(frontLeft, frontRight, POINTS_PER_CAR_SIDE));
+		carSidePoints.addAll(pointsBetween(rearLeft, rearRight, POINTS_PER_CAR_SIDE));
+		carSidePoints.addAll(pointsBetween(rearRight, frontRight, POINTS_PER_CAR_SIDE));
+
+		return carSidePoints;
+	}
+
+	private List<Point> pointsBetween(Point p1, Point p2, int amount) {
+		double xStep = (p2.getX() - p1.getX()) / (double) amount;
+		double yStep = (p2.getY() - p1.getY()) / (double) amount;
+		List<Point> points = new ArrayList<>(amount);
+		for (int i = 0; i < amount; i++) {
+			Point current = new Point(p1.getX() + xStep * i, p1.getY() + yStep * i);
+			points.add(current);
+		}
+		return points;
+	}
+
+	private void drawTotalDistance(List<Point> tracePoints) {
+		gc.setFont(Font.font(30));
+		gc.fillText(String.valueOf(tracePoints.size()), 630, 50);
 	}
 
 	private void drawTraсe(List<Point> trace) {
@@ -342,7 +421,7 @@ public class Main extends Application {
 		double wheelXShift = 0.15 * axisLength * cos(wheelAngle);
 		double wheelYShift = 0.15 * axisLength * sin(wheelAngle);
 
-		Point wheelShift = new Point(wheelXShift, wheelYShift);
+		Vector wheelShift = new Vector(wheelXShift, wheelYShift);
 
 		double wheelWidth = leftWheel.distanceTo(rightWheel) * 0.15;
 
@@ -352,8 +431,8 @@ public class Main extends Application {
 
 	private void drawLine(Point p1, Point p2, double width) {
 		gc.beginPath();
-		gc.moveTo(p1.getX(), canvas.getWidth() - p1.getY());
-		gc.lineTo(p2.getX(), canvas.getWidth() - p2.getY());
+		gc.moveTo(p1.getX(), canvas.getHeight() - p1.getY());
+		gc.lineTo(p2.getX(), canvas.getHeight() - p2.getY());
 		gc.setLineWidth(width);
 		gc.stroke();
 	}
@@ -363,6 +442,12 @@ public class Main extends Application {
 		gc.setStroke(color);
 		drawLine(p1, p2, width);
 		gc.setStroke(prevStroke);
+	}
+	 void fillRect(double x, double y, double width, double height, Color color) {
+		Paint prevFill = gc.getFill();
+		gc.setFill(color);
+		gc.fillRect(x, canvas.getHeight() - y - height, width, height);
+		gc.setFill(prevFill);
 	}
 
 
