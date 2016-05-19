@@ -33,8 +33,10 @@ public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
-	private static final double CAR_WIDTH = 30;
-	private static final double CAR_LENGTH = 45;
+	private static final double CAR_WIDTH = 15;
+	private static final double CAR_LENGTH = 20;
+
+	private static final double OBSTACLE_SIZE = 25;
 
 	private GraphicsContext gc;
 	private Canvas canvas;
@@ -159,7 +161,10 @@ public class Main extends Application {
 								createTarget(car, firstTargetPoint, direction);
 							}
 						} else if (e.getButton() == MouseButton.SECONDARY) {
-							obstacles.add(new Obstacle(new Point(e.getX(), canvas.getHeight() - e.getY()), 50, 50));
+							obstacles.add(
+									new Obstacle(new Point(e.getX(), canvas.getHeight() - e.getY()),
+									OBSTACLE_SIZE, OBSTACLE_SIZE)
+							);
 							collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
 						}
 					}
