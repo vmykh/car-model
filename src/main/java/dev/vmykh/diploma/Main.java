@@ -21,6 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.lang.Math.*;
 
@@ -42,6 +47,8 @@ public class Main extends Application {
 
 	private Timer timer = new Timer();
 
+	private CollisionDetector collisionDetector = new CollisionDetector(new ArrayList<>(), CANVAS_WIDTH, CANVAS_HEIGHT);
+
 	private volatile boolean upKeyIsPressed = false;
 	private volatile boolean downKeyIsPressed = false;
 	private volatile boolean rightKeyIsPressed = false;
@@ -57,16 +64,12 @@ public class Main extends Application {
 
 	private List<Obstacle> obstacles = new ArrayList();
 
-	private static final int POINTS_PER_CAR_SIDE = 8;
-
-	// TODO(vmykh): remove this bullshit
-	{
-		obstacles.add(new Obstacle(new Point(200, 350), 50, 50));
-	}
+	private CopyOnWriteArrayList<List<Point>> intermediatePath = new CopyOnWriteArrayList<>();
+	private int drawedSubpathes = 0;
+	private final AtomicBoolean computingPathNow = new AtomicBoolean(false);
 
 	@Override
 	public void start(Stage stage) {
-
 		initUI(stage);
 	}
 
@@ -113,10 +116,24 @@ public class Main extends Application {
 					target = null;
 					tracePoints.clear();
 					obstacles.clear();
+					collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
 					firstCarPoint = null;
 					secondCarPoint = null;
 					firstTargetPoint = null;
 					secondTargetPoint = null;
+				} else if (event.getCode() == KeyCode.P && event.getEventType() == KeyEvent.KEY_RELEASED) {
+					Point targetCenter = target.get(0).add(new Vector(target.get(0), target.get(2)).multipliedBy(0.5));
+					computingPathNow.set(true);
+					intermediatePath.clear();
+					Executor executor = Executors.newSingleThreadExecutor();
+					AtomicReference<List<Movement>> controls = new AtomicReference<>();
+					executor.execute(() -> {
+						controls.set(new PathResolver(
+							targetCenter, collisionDetector, new IntermediatePathPainter()).resolvePath(car));
+						computingPathNow.set(false);
+						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
+					});
+					System.out.println(controls);
 				}
 			}
 		};
@@ -143,6 +160,7 @@ public class Main extends Application {
 							}
 						} else if (e.getButton() == MouseButton.SECONDARY) {
 							obstacles.add(new Obstacle(new Point(e.getX(), canvas.getHeight() - e.getY()), 50, 50));
+							collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
 						}
 					}
 				});
@@ -243,6 +261,42 @@ public class Main extends Application {
 		drawLine(arrowHead, arrowHeadRight, width, color);
 	}
 
+	private TimerTask createTimerTaskAutonomousDriving(List<Movement> movements) {
+		return new TimerTask() {
+			@Override
+			public void run() {
+				Platform.runLater(new Runnable() {
+					@Override
+					public void run() {
+						if (!movements.isEmpty()) {
+							Movement currentMovement = movements.get(0);
+							if (currentMovement != null) {
+								switch (currentMovement) {
+									case FORWARD:
+										car = car.withFrontAxisAngle(0.0).movedBy(PathResolver.ONE_STEP_DISTANCE);
+										break;
+									case FORWARD_LEFT:
+										car = car.withFrontAxisAngle(PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+												.movedBy(PathResolver.ONE_STEP_DISTANCE);
+										break;
+									case FORWARD_RIGHT:
+										car = car.withFrontAxisAngle(-PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+												.movedBy(PathResolver.ONE_STEP_DISTANCE);
+										break;
+								}
+							}
+						}
+						drawScene();
+						if (movements.size() > 0) {
+							movements.remove(0);
+							timer.schedule(createTimerTaskAutonomousDriving(movements), 25L);
+						}
+					}
+				});
+			}
+		};
+	}
+
 	private TimerTask createTimerTask() {
 		return new TimerTask() {
 			@Override
@@ -250,46 +304,45 @@ public class Main extends Application {
 				Platform.runLater(new Runnable() {
 					@Override
 					public void run() {
-						if (car == null) {
-							gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+						if (computingPathNow.get()) {
+							if (drawedSubpathes < intermediatePath.size()) {
+								List<Point> subpath = intermediatePath.get(drawedSubpathes++);
+								for (Point point : subpath) {
+									drawCircle(point, 3, Color.DARKGREEN);
+								}
+							}
 						} else {
-							Point currentPos = new Point(car.getX(), car.getY());
-
-							if (tracePoints.isEmpty()) {
-								tracePoints.add(currentPos);
-							} else if (!tracePoints.get(tracePoints.size() - 1).equals(currentPos)) {
-								tracePoints.add(currentPos);
-							}
-
-							Car newCar;
-							if (leftKeyIsPressed) {
-								newCar = car.withFrontAxisAngle(PI / 8.0);
-							} else if (rightKeyIsPressed) {
-								newCar = car.withFrontAxisAngle(-PI / 8.0);
+							if (car == null) {
+								gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 							} else {
-								newCar = car.withFrontAxisAngle(0.0);
-							}
+								Point currentPos = new Point(car.getX(), car.getY());
 
-							if (upKeyIsPressed) {
-								newCar = newCar.movedBy(5);
-							} else if (downKeyIsPressed) {
-								newCar = newCar.movedBy(-5);
-							}
+								if (tracePoints.isEmpty()) {
+									tracePoints.add(currentPos);
+								} else if (!tracePoints.get(tracePoints.size() - 1).equals(currentPos)) {
+									tracePoints.add(currentPos);
+								}
 
-							if (!carOverlapsWithObstacles(newCar)) {
-								car = newCar;
-							}
+								Car newCar;
+								if (leftKeyIsPressed) {
+									newCar = car.withFrontAxisAngle(PI / 8.0);
+								} else if (rightKeyIsPressed) {
+									newCar = car.withFrontAxisAngle(-PI / 8.0);
+								} else {
+									newCar = car.withFrontAxisAngle(0.0);
+								}
 
-							gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-							if (target != null) {
-								drawTarget(target);
-							}
-							drawTraсe(tracePoints);
-							drawCar(car);
-							drawTotalDistance(tracePoints);
+								if (upKeyIsPressed) {
+									newCar = newCar.movedBy(5);
+								} else if (downKeyIsPressed) {
+									newCar = newCar.movedBy(-5);
+								}
 
-							for (Obstacle obstacle : obstacles) {
-								drawObstacle(obstacle);
+								if (!collisionDetector.collides(newCar)) {
+									car = newCar;
+								}
+
+								drawScene();
 							}
 						}
 						timer.schedule(createTimerTask(), 25L);
@@ -299,45 +352,19 @@ public class Main extends Application {
 		};
 	}
 
-	private boolean carOverlapsWithObstacles(Car car) {
+	private void drawScene() {
+		gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+		if (target != null) {
+			drawTarget(target);
+		}
+
+		drawTraсe(tracePoints);
+		drawCar(car);
+		drawTotalDistance(tracePoints);
+
 		for (Obstacle obstacle : obstacles) {
-			List<Point> carSidePoints = generateCarSidePoints(car);
-			for (Point carSidePoint : carSidePoints) {
-				if (obstacle.contains(carSidePoint)) {
-					return true;
-				}
-			}
+			drawObstacle(obstacle);
 		}
-		return false;
-	}
-
-	private List<Point> generateCarSidePoints(Car car) {
-		Vector fromRearToFront = new Vector(car.getBackAxisCenter(), car.getFrontAxisCenter());
-		Vector fromRightWheelToLeftWheel = fromRearToFront.perpendicular().normalized().multipliedBy(car.getWidth());
-
-		Point rearLeft = car.getBackAxisCenter().add(fromRightWheelToLeftWheel.multipliedBy(0.5));
-		Point frontLeft = rearLeft.add(fromRearToFront);
-		Point frontRight = frontLeft.add(fromRightWheelToLeftWheel.negative());
-		Point rearRight = rearLeft.add(fromRightWheelToLeftWheel.negative());
-
-		List<Point> carSidePoints = new ArrayList<>(POINTS_PER_CAR_SIDE * 4);
-		carSidePoints.addAll(pointsBetween(rearLeft, frontLeft, POINTS_PER_CAR_SIDE));
-		carSidePoints.addAll(pointsBetween(frontLeft, frontRight, POINTS_PER_CAR_SIDE));
-		carSidePoints.addAll(pointsBetween(rearLeft, rearRight, POINTS_PER_CAR_SIDE));
-		carSidePoints.addAll(pointsBetween(rearRight, frontRight, POINTS_PER_CAR_SIDE));
-
-		return carSidePoints;
-	}
-
-	private List<Point> pointsBetween(Point p1, Point p2, int amount) {
-		double xStep = (p2.getX() - p1.getX()) / (double) amount;
-		double yStep = (p2.getY() - p1.getY()) / (double) amount;
-		List<Point> points = new ArrayList<>(amount);
-		for (int i = 0; i < amount; i++) {
-			Point current = new Point(p1.getX() + xStep * i, p1.getY() + yStep * i);
-			points.add(current);
-		}
-		return points;
 	}
 
 	private void drawTotalDistance(List<Point> tracePoints) {
@@ -450,11 +477,19 @@ public class Main extends Application {
 		gc.setFill(prevFill);
 	}
 
+	private final class IntermediatePathPainter implements PathResolverListener {
 
+		@Override
+		public void intermediatePoints(List<Point> points) {
+			List<Point> copy = new ArrayList<>(points);
+			Platform.runLater(() -> {
+						intermediatePath.add(copy);
+					}
+			);
+		}
+	}
 
 	public static void main(String[] args) {
 		launch(args);
 	}
-
-
 }

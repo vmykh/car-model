@@ -59,6 +59,10 @@ public final class Car {
 		return y;
 	}
 
+	public Point getCenter() {
+		return new Point(x, y);
+	}
+
 	public double getOrientationAngle() {
 		return orientationAngle;
 	}
