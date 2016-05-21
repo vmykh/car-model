@@ -288,6 +288,17 @@ public class Main extends Application {
 										car = car.withFrontAxisAngle(-PathResolver.FRONT_AXIS_ROTATION_ANGLE)
 												.movedBy(PathResolver.ONE_STEP_DISTANCE);
 										break;
+									case BACKWARD:
+										car = car.withFrontAxisAngle(0.0).movedBy(-PathResolver.ONE_STEP_DISTANCE);
+										break;
+									case BACKWARD_LEFT:
+										car = car.withFrontAxisAngle(PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+												.movedBy(-PathResolver.ONE_STEP_DISTANCE);
+										break;
+									case BACKWARD_RIGHT:
+										car = car.withFrontAxisAngle(-PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+												.movedBy(-PathResolver.ONE_STEP_DISTANCE);
+										break;
 								}
 							}
 						}

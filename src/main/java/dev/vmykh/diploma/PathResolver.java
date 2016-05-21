@@ -85,6 +85,24 @@ public final class PathResolver {
 				// do nothing
 			}
 
+			try {
+				states.add(moveBackward(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			try {
+				states.add(moveBackwardLeft(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			try {
+				states.add(moveBackwardRight(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
 			if (states.size() == 0) {
 				throw new RuntimeException("Cannot resolve path");
 			}
@@ -162,6 +180,45 @@ public final class PathResolver {
 		);
 	}
 
+	private CarState moveBackward(CarState carState) throws ImpossibleMovementException {
+		Car movedCar = carState.car.withFrontAxisAngle(0.0).movedBy(-ONE_STEP_DISTANCE);
+		if (collisionDetector.collides(movedCar)) {
+			throw new ImpossibleMovementException();
+		}
+		return new CarState(
+				movedCar,
+				Movement.BACKWARD,
+				computeHeuristic(movedCar),
+				carState
+		);
+	}
+
+	private CarState moveBackwardLeft(CarState carState) throws ImpossibleMovementException {
+		Car movedCar = carState.car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
+		if (collisionDetector.collides(movedCar)) {
+			throw new ImpossibleMovementException();
+		}
+		return new CarState(
+				movedCar,
+				Movement.BACKWARD_LEFT,
+				computeHeuristic(movedCar),
+				carState
+		);
+	}
+
+	private CarState moveBackwardRight(CarState carState) throws ImpossibleMovementException {
+		Car movedCar = carState.car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
+		if (collisionDetector.collides(movedCar)) {
+			throw new ImpossibleMovementException();
+		}
+		return new CarState(
+				movedCar,
+				Movement.BACKWARD_RIGHT,
+				computeHeuristic(movedCar),
+				carState
+		);
+	}
+
 	private double computeHeuristic(Car car) {
 		double positionWeight = 0.0;
 		CellWeight cellWeight = weights.get(roundPoint(car.getCenter()));
@@ -172,7 +229,8 @@ public final class PathResolver {
 		Vector fromCarToTarget = new Vector(car.getCenter(), target);
 		double orientationWeight = abs(car.getOrientationAngle() - fromCarToTarget.getAngle()) * 20;
 
-		return computeDistanceToTarget(car) + positionWeight + orientationWeight;
+//		return computeDistanceToTarget(car) + positionWeight + orientationWeight;
+		return computeDistanceToTarget(car) + positionWeight;
 	}
 
 	private double computeDistanceToTarget(Car car) {
