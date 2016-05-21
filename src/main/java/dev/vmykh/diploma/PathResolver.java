@@ -9,6 +9,7 @@ public final class PathResolver {
 	public static final double ONE_STEP_DISTANCE = 5.0;
 	public static final double FRONT_AXIS_ROTATION_ANGLE = PI / 8.0;
 	public static final double ACCEPTABLE_FINISH_POSITION_ERROR = 10.0;
+	private static final int WEIGHTED_DIRECTIONS_PER_CELL = 32;
 
 	public static final double ACCEPTABLE_HEURISTIC_DIFFERENCE = 50.0;
 
@@ -16,7 +17,7 @@ public final class PathResolver {
 	private final CollisionDetector collisionDetector;
 
 	private static final int WEIGHT_CELL_SIZE = 3;
-	private final Map<IntegerPoint, Long> weights = new HashMap<>();
+	private final Map<IntegerPoint, CellWeight> weights = new HashMap<>();
 
 	private final PathResolverListener listener;
 
@@ -32,7 +33,7 @@ public final class PathResolver {
 		List<Point> discardedStates = new ArrayList<>();
 		int iterations = 0;
 		int skippedIterations = 0;
-		while (computeHeuristic(currentState.getCar()) > ACCEPTABLE_FINISH_POSITION_ERROR) {
+		while (computeDistanceToTarget(currentState.getCar()) > ACCEPTABLE_FINISH_POSITION_ERROR) {
 //			if (iterations > 10_000) {
 //				System.out.println("bangura");
 //			}
@@ -59,9 +60,9 @@ public final class PathResolver {
 
 			IntegerPoint intPoint = roundPoint(currentStateCenter);
 			if (!weights.containsKey(intPoint)) {
-				weights.put(intPoint, 0L);
+				weights.put(intPoint, new CellWeight(WEIGHTED_DIRECTIONS_PER_CELL));
 			}
-			weights.put(intPoint, weights.get(intPoint) + 1);
+			weights.get(intPoint).addWeight(car.getOrientationAngle());
 
 			discardedStates.add(currentStateCenter);
 			states.remove(currentState);
@@ -162,12 +163,20 @@ public final class PathResolver {
 	}
 
 	private double computeHeuristic(Car car) {
-		double extra = 0.0;
-		Long extraWeight = weights.get(roundPoint(car.getCenter()));
-		if (extraWeight != null) {
-			extra = extraWeight;
+		double positionWeight = 0.0;
+		CellWeight cellWeight = weights.get(roundPoint(car.getCenter()));
+		if (cellWeight != null) {
+			positionWeight = cellWeight.getWeight(car.getOrientationAngle());
 		}
-		return car.getCenter().distanceTo(target) + extra * 5;
+
+		Vector fromCarToTarget = new Vector(car.getCenter(), target);
+		double orientationWeight = abs(car.getOrientationAngle() - fromCarToTarget.getAngle()) * 20;
+
+		return computeDistanceToTarget(car) + positionWeight + orientationWeight;
+	}
+
+	private double computeDistanceToTarget(Car car) {
+		return car.getCenter().distanceTo(target);
 	}
 
 	private static final class CarState implements Comparable<CarState> {
@@ -175,6 +184,8 @@ public final class PathResolver {
 		private final Movement causedMovement;
 		private final double heuristic;
 		private final CarState previousCarState;
+
+
 
 		public CarState(Car car, Movement causedMovement, double heuristic, CarState previousCarState) {
 			this.car = car;
@@ -205,41 +216,4 @@ public final class PathResolver {
 		}
 	}
 
-	private static final class IntegerPoint {
-		private final int x;
-		private final int y;
-
-		public IntegerPoint(int x, int y) {
-			this.x = x;
-			this.y = y;
-		}
-
-		public int getX() {
-			return x;
-		}
-
-		public int getY() {
-			return y;
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (this == o) return true;
-			if (!(o instanceof IntegerPoint)) return false;
-
-			IntegerPoint that = (IntegerPoint) o;
-
-			if (x != that.x) return false;
-			if (y != that.y) return false;
-
-			return true;
-		}
-
-		@Override
-		public int hashCode() {
-			int result = x;
-			result = 31 * result + y;
-			return result;
-		}
-	}
 }

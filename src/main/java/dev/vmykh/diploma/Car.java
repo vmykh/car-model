@@ -67,6 +67,10 @@ public final class Car {
 		return orientationAngle;
 	}
 
+	public Vector getOrientationVector() {
+		return new Vector(getCenter(), new Point(x + cos(orientationAngle), y + sin(orientationAngle))).normalized();
+	}
+
 	public double getFrontAxisAngle() {
 		return frontAxisAngle;
 	}
