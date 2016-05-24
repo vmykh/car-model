@@ -24,11 +24,11 @@ public final class Vector {
 		return y;
 	}
 
-	public double getMagnitude() {
+	public double length() {
 		return sqrt(x*x + y*y);
 	}
 
-	public double getAngle() {
+	public double angle() {
 		if (abs(x) < 0.000001) {
 			if (y > 0) {
 				return 0.5 * PI;
@@ -53,7 +53,7 @@ public final class Vector {
 	}
 
 	public Vector normalized() {
-		return new Vector(x / getMagnitude(), y / getMagnitude());
+		return new Vector(x / length(), y / length());
 	}
 
 	public Vector perpendicular() {
@@ -68,8 +68,17 @@ public final class Vector {
 		return new Vector(x + other.x, y + other.y);
 	}
 
+	public double dotProduct(Vector other) {
+		return this.x * other.x + this.y * other.y;
+	}
+
 	public double crossProduct(Vector other) {
 		return this.x * other.y - other.x * this.y;
+	}
+
+	public double angleTo(Vector other) {
+		double angle = atan2(this.crossProduct(other), this.dotProduct(other));
+		return angle > 0 ? angle : 2 * PI + angle;
 	}
 
 	@Override

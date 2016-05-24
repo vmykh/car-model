@@ -33,7 +33,7 @@ public final class Car {
 	}
 
 	public Car setInitialOrientation(double alpha) {
-		this.orientationAngle = alpha;
+		this.orientationAngle = convertTo2PISystem(alpha);
 		return this;
 	}
 
@@ -130,14 +130,14 @@ public final class Car {
 
 			Point carCenter = new Point(x, y);
 			Vector fromCircleCenterToCarCenter = new Vector(rotationCircleCenter, carCenter);
-			double rotationRadius = fromCircleCenterToCarCenter.getMagnitude();
+			double rotationRadius = fromCircleCenterToCarCenter.length();
 
 			Point pointOnMainAxis = new Point(x + cos(orientationAngle), y + sin(orientationAngle));
 			Vector carDirection = new Vector(carCenter, pointOnMainAxis);
 
 			boolean rotateCounterClockWise = fromCircleCenterToCarCenter.crossProduct(carDirection) > 0.0;
 
-			double startAngle = fromCircleCenterToCarCenter.getAngle();
+			double startAngle = fromCircleCenterToCarCenter.angle();
 			double rotationAngleAbs = distance / rotationRadius;
 			double rotationAngle = rotateCounterClockWise ? rotationAngleAbs : -rotationAngleAbs;
 			double endAngle = startAngle + rotationAngle;
@@ -152,6 +152,65 @@ public final class Car {
 		movedCar.setInitialOrientation(newOrientationAngle);
 		movedCar.setInitialFrontAxisAngle(frontAxisAngle);
 		return movedCar;
+	}
+
+	private static double convertTo2PISystem(double angle) {
+		double mod = 2 * PI;
+		double angleIn2PI = angle % mod;
+		if (angleIn2PI < 0)
+		{
+			angleIn2PI += mod;
+		}
+		return angleIn2PI;
+	}
+
+	// TODO(vmykh): refactor this method
+	public double getRotationCircleRadius() {
+
+		if (abs(frontAxisAngle) < 0.0001) {
+			throw new RuntimeException();
+		} else {
+			double orientAngleShifted = orientationAngle + PI / 2;
+
+			Point backAxisCenter = getBackAxisCenter();
+			Point backAxisExtraPoint = new Point(
+					backAxisCenter.getX() + cos(orientAngleShifted),
+					backAxisCenter.getY() + sin(orientAngleShifted)
+			);
+			Map<String, Double> backAxisCoefs = lineEquation(backAxisCenter, backAxisExtraPoint);
+
+			Point frontAxisCenter = getFrontAxisCenter();
+			Point frontAxisExtraPoint = new Point(
+					frontAxisCenter.getX() + cos(orientAngleShifted + frontAxisAngle),
+					frontAxisCenter.getY() + sin(orientAngleShifted + frontAxisAngle)
+			);
+			Map<String, Double> frontAxisCoefs = lineEquation(frontAxisCenter, frontAxisExtraPoint);
+
+			// find intersection point of two lines
+			RealMatrix coefficients =
+					new Array2DRowRealMatrix(new double[][]
+							{
+									{ frontAxisCoefs.get("a"), frontAxisCoefs.get("b") },
+									{ backAxisCoefs.get("a"), backAxisCoefs.get("b") }
+							},
+							false);
+
+			DecompositionSolver solver = new LUDecomposition(coefficients).getSolver();
+
+			RealVector constants = new ArrayRealVector(
+					new double[] { -frontAxisCoefs.get("c"), -backAxisCoefs.get("c") },
+					false);
+			RealVector solution = solver.solve(constants);
+
+			Point rotationCircleCenter = new Point(solution.getEntry(0), solution.getEntry(1));
+
+
+			Point carCenter = new Point(x, y);
+			Vector fromCircleCenterToCarCenter = new Vector(rotationCircleCenter, carCenter);
+			double rotationRadius = fromCircleCenterToCarCenter.length();
+
+			return rotationRadius;
+		}
 	}
 
 	// (x-x1)/(x2-x1) = (y-y1)/(y2-y1) => ax+by+c=0
@@ -185,5 +244,10 @@ public final class Car {
 		double frontCenterY = y + yShift;
 
 		return new Point(frontCenterX, frontCenterY);
+	}
+
+	@Override
+	public String toString() {
+		return "Position: " + getCenter() + "   Orientation: " + getOrientationAngle();
 	}
 }

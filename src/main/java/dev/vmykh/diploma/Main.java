@@ -59,10 +59,14 @@ public class Main extends Application {
 	private Point firstTargetPoint;
 	private Point secondTargetPoint;
 
+	private Point targetTemp;
+
 	private Point firstCarPoint;
 	private Point secondCarPoint;
 
 	private volatile List<Point> target;
+
+	private volatile boolean cancelOrdinaryTask = false;
 
 	private List<Obstacle> obstacles = new ArrayList();
 
@@ -125,13 +129,22 @@ public class Main extends Application {
 					secondTargetPoint = null;
 				} else if (event.getCode() == KeyCode.P && event.getEventType() == KeyEvent.KEY_RELEASED) {
 					Point targetCenter = target.get(0).add(new Vector(target.get(0), target.get(2)).multipliedBy(0.5));
+					Vector targetOrientation = new Vector(target.get(0), target.get(1));
+					PositionWithDirection target = new PositionWithDirection(targetCenter, targetOrientation);
 					computingPathNow.set(true);
+					cancelOrdinaryTask = true;
 					intermediatePath.clear();
 					Executor executor = Executors.newSingleThreadExecutor();
 					AtomicReference<List<Movement>> controls = new AtomicReference<>();
+
+					Point targetPosition = target.getPosition().subtract(targetOrientation
+							.normalized().multipliedBy(car.getLength() / 2.0));
+
+					targetTemp = targetPosition;
+
 					executor.execute(() -> {
 						controls.set(new PathResolver(
-							targetCenter, collisionDetector, new IntermediatePathPainter()).resolvePath(car));
+							target, collisionDetector, new IntermediatePathPainter()).resolvePath(car));
 						computingPathNow.set(false);
 						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
 					});
@@ -194,7 +207,7 @@ public class Main extends Application {
 	private static Car createCar(Point backCenterPoint, Vector direction) {
 		return new Car(CAR_WIDTH, CAR_LENGTH)
 				.setInitialPosition(backCenterPoint.add(direction.normalized().multipliedBy(CAR_LENGTH * 0.5)))
-				.setInitialOrientation(direction.getAngle());
+				.setInitialOrientation(direction.angle());
 	}
 
 	private void createTarget(Car car, Point backCenterPosition, Vector direction) {
@@ -320,6 +333,13 @@ public class Main extends Application {
 				Platform.runLater(new Runnable() {
 					@Override
 					public void run() {
+
+//						// TODO(vmykh): clear this
+//						if (cancelOrdinaryTask) {
+//							return;
+//						}
+
+
 						if (computingPathNow.get()) {
 							if (drawedSubpathes < intermediatePath.size()) {
 								List<Point> subpath = intermediatePath.get(drawedSubpathes++);
@@ -331,7 +351,7 @@ public class Main extends Application {
 							if (car == null) {
 								gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 							} else {
-								Point currentPos = new Point(car.getX(), car.getY());
+								Point currentPos = car.getBackAxisCenter();
 
 								if (tracePoints.isEmpty()) {
 									tracePoints.add(currentPos);
@@ -372,6 +392,10 @@ public class Main extends Application {
 		gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 		if (target != null) {
 			drawTarget(target);
+		}
+
+		if (targetTemp != null) {
+			drawCircle(targetTemp, 5.0, Color.AZURE);
 		}
 
 		drawTraсe(tracePoints);
@@ -458,7 +482,7 @@ public class Main extends Application {
 
 		double axisLength = leftWheel.distanceTo(rightWheel);
 
-		double axisAngle = new Vector(leftWheel, rightWheel).getAngle();
+		double axisAngle = new Vector(leftWheel, rightWheel).angle();
 		double wheelAngle = axisAngle + 0.5 * PI;
 
 		double wheelXShift = 0.15 * axisLength * cos(wheelAngle);
