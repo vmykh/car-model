@@ -16,6 +16,10 @@ public final class Vector {
 		this.y = p2.getY() - p1.getY();
 	}
 
+	public static Vector fromAngle(double angle) {
+		return new Vector(cos(angle), sin(angle));
+	}
+
 	public double getX() {
 		return x;
 	}
@@ -29,23 +33,8 @@ public final class Vector {
 	}
 
 	public double angle() {
-		if (abs(x) < 0.000001) {
-			if (y > 0) {
-				return 0.5 * PI;
-			} else {
-				return 1.5 * PI;
-			}
-		} else {
-			double angle = atan(y / x);
-			if (angle < 0) {
-				angle += PI;
-			}
-			if (y > 0) {
-				return angle;
-			} else {
-				return angle + PI;
-			}
-		}
+		double alpha = atan2(y, x);
+		return alpha > 0 ? alpha : 2 * PI + alpha;
 	}
 
 	public Vector negative() {

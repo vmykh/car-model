@@ -2,7 +2,7 @@ package dev.vmykh.diploma;
 
 import java.util.*;
 
-import static dev.vmykh.diploma.DubinsCurveType.RSR;
+import static dev.vmykh.diploma.DubinsCurveType.*;
 import static java.lang.Math.PI;
 import static java.lang.Math.abs;
 
@@ -137,51 +137,74 @@ public final class PathResolver {
 
 		// Dubins curves
 		double curvatureRadius = car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).getRotationCircleRadius();
-		DubinsCurveInfo rsrInfo = DubinsCurves.computeCurves(
+		Map<DubinsCurveType, DubinsCurveInfo> curves = DubinsCurves.computeCurves(
 				new PositionWithDirection(car.getBackAxisCenter(), car.getOrientationVector()),
 				new PositionWithDirection(targetPosition.subtract(targetOrientation
 						.normalized().multipliedBy(car.getLength() / 2.0)), targetOrientation),
 				curvatureRadius
-				).get(RSR);
+				);
+		
+		
+		DubinsCurveType chosenCurveType = null;
+		DubinsCurveInfo chosenCurveInfo = null;
+		for (DubinsCurveType currentCurveType : curves.keySet()) {
+			DubinsCurveInfo currentCurveInfo = curves.get(currentCurveType);
+			if (chosenCurveType == null) {
+				chosenCurveType = currentCurveType;
+				chosenCurveInfo = curves.get(currentCurveType);
+			} else if (currentCurveInfo.getPathLength() < chosenCurveInfo.getPathLength()) {
+				chosenCurveInfo = currentCurveInfo;
+				chosenCurveType = currentCurveType;
+			}
+		}
 
 
 
-		List<Movement> controls = new ArrayList<>();
-		Car currentCar = car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE);
-		double acceptableError = 1.5;
 		int iter = 0;
-//		while(currentCar.getCenter().distanceTo(rsrInfo.getFirstCircleTangentPoint()) > acceptableError) {
-		Vector straightLineVector = new Vector(rsrInfo.getFirstCircleTangentPoint(), rsrInfo.getSecondCircleTangentPoint());
+		Vector straightLineVector = new Vector(
+				chosenCurveInfo.getFirstCircleTangentPoint(),
+				chosenCurveInfo.getSecondCircleTangentPoint()
+		);
+		List<Movement> controls = new ArrayList<>();
+
+		double firstPartFrontAxisAngle;
+		Movement firstPartMovement;
+		if (chosenCurveType == RSR || chosenCurveType == RSL) {
+			firstPartFrontAxisAngle = -FRONT_AXIS_ROTATION_ANGLE;
+			firstPartMovement = Movement.FORWARD_RIGHT;
+		} else if (chosenCurveType == LSL || chosenCurveType == LSR) {
+			firstPartFrontAxisAngle = FRONT_AXIS_ROTATION_ANGLE;
+			firstPartMovement = Movement.FORWARD_LEFT;
+		} else {
+			throw new RuntimeException("Illegal curve type");
+		}
+
+		Car currentCar = car.withFrontAxisAngle(firstPartFrontAxisAngle);
 		double straightDirectionAngle = straightLineVector.angle();
 		while(abs(currentCar.getOrientationAngle() - straightDirectionAngle) > 0.05) {
 			currentCar = currentCar.movedBy(ONE_STEP_DISTANCE);
-			controls.add(Movement.FORWARD_RIGHT);
+			controls.add(firstPartMovement);
 			iter++;
 			if (iter > 2000) {
 				return controls;
 			}
 		}
 
-//		while(currentCar.getCenter().distanceTo(rsrInfo.getFirstCircleTangentPoint()) < acceptableError) {
-//			currentCar = currentCar.movedBy(ONE_STEP_DISTANCE);
-//			controls.add(Movement.FORWARD_RIGHT);
-//			iter++;
-//			if (iter > 2000) {
-//				return controls;
-//			}
-//		}
+
+
 
 		currentCar = currentCar.withFrontAxisAngle(0.0);
 		PIDController pidController = new PIDController(1.0, 5.0, 0.0, 1.5);
 		double prevErrorToFinalPoint = Long.MAX_VALUE;
 		while(true) {
-			double currentErrorToFinalPoint = currentCar.getBackAxisCenter().distanceTo(rsrInfo.getSecondCircleTangentPoint());
+			double currentErrorToFinalPoint =
+					currentCar.getBackAxisCenter().distanceTo(chosenCurveInfo.getSecondCircleTangentPoint());
 			if (currentErrorToFinalPoint > prevErrorToFinalPoint) {
 				break;
 			}
 			prevErrorToFinalPoint = currentErrorToFinalPoint;
 			double error = distanceFromPointToLine(currentCar.getBackAxisCenter(),
-					rsrInfo.getFirstCircleTangentPoint(), rsrInfo.getSecondCircleTangentPoint());
+					chosenCurveInfo.getFirstCircleTangentPoint(), chosenCurveInfo.getSecondCircleTangentPoint());
 			int steering = pidController.currentError(error);
 			Movement movement = Movement.FORWARD;
 			currentCar = currentCar.withFrontAxisAngle(0.0);
@@ -199,10 +222,28 @@ public final class PathResolver {
 				return controls;
 			}
 		}
-		currentCar = currentCar.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE);
-		while(currentCar.getCenter().distanceTo(targetPosition) > acceptableError) {
+
+
+
+
+//		double acceptableError = 1.5;
+		double secondPartFrontAxisAngle;
+		Movement secondPartMovement;
+		if (chosenCurveType == RSR || chosenCurveType == LSR) {
+			secondPartFrontAxisAngle = -FRONT_AXIS_ROTATION_ANGLE;
+			secondPartMovement = Movement.FORWARD_RIGHT;
+		} else if (chosenCurveType == LSL || chosenCurveType == RSL) {
+			secondPartFrontAxisAngle = FRONT_AXIS_ROTATION_ANGLE;
+			secondPartMovement = Movement.FORWARD_LEFT;
+		} else {
+			throw new RuntimeException("Illegal curve type");
+		}
+
+		currentCar = currentCar.withFrontAxisAngle(secondPartFrontAxisAngle);
+//		while(currentCar.getCenter().distanceTo(targetPosition) > acceptableError) {
+		while(abs(currentCar.getOrientationAngle() - targetOrientation.angle()) > 0.05) {
 			currentCar = currentCar.movedBy(ONE_STEP_DISTANCE);
-			controls.add(Movement.FORWARD_RIGHT);
+			controls.add(secondPartMovement);
 			iter++;
 			if (iter > 2000) {
 				return controls;
