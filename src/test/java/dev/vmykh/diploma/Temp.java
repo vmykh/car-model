@@ -21,4 +21,10 @@ public class Temp {
 	public static double angle(Vector v1, Vector v2) {
 		return v1.angleTo(v2) * 360 / (2 * PI);
 	}
+
+	@Test
+	public void test3() {
+		System.out.println(Math.ceil(-1.5));
+		System.out.println(Math.floor(-1.5));
+	}
 }

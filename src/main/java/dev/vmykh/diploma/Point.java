@@ -11,6 +11,11 @@ public final class Point {
 		this.y = y;
 	}
 
+	public Point(IntegerPoint point) {
+		this.x = point.getX();
+		this.y = point.getY();
+	}
+
 	public double getX() {
 		return x;
 	}

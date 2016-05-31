@@ -36,4 +36,12 @@ public final class IntegerPoint {
 		result = 31 * result + y;
 		return result;
 	}
+
+	@Override
+	public String toString() {
+		return "IntegerPoint{" +
+				"x=" + x +
+				", y=" + y +
+				'}';
+	}
 }

@@ -33,8 +33,8 @@ public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
-	private static final double CAR_WIDTH = 15;
-	private static final double CAR_LENGTH = 20;
+	private static final double CAR_WIDTH = 45;
+	private static final double CAR_LENGTH = 60;
 
 	private static final double OBSTACLE_SIZE = 25;
 
