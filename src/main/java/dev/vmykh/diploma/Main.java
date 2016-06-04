@@ -351,7 +351,7 @@ public class Main extends Application {
 							if (car == null) {
 								gc.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 							} else {
-								Point currentPos = car.getBackAxisCenter();
+								Point currentPos = car.getBackAxleCenter();
 
 								if (tracePoints.isEmpty()) {
 									tracePoints.add(currentPos);
@@ -419,12 +419,12 @@ public class Main extends Application {
 	}
 
 	private void drawCar(Car car) {
-		double x = car.getX();
-		double y = car.getY();
+		double x = car.getCenter().getX();
+		double y = car.getCenter().getY();
 		double l = car.getLength();
 		double w = car.getWidth();
 		double orientAngle = car.getOrientationAngle();
-		double frontAxisAngle = car.getFrontAxisAngle();
+		double frontAxisAngle = car.getSteeringAngle();
 
 		double xShift = 0.5 * l * cos(orientAngle);
 		double yShift = 0.5 * l * sin(orientAngle);

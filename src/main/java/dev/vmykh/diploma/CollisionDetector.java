@@ -36,10 +36,10 @@ public final class CollisionDetector {
 	}
 
 	private List<Point> generateCarSidePoints(Car car) {
-		Vector fromRearToFront = new Vector(car.getBackAxisCenter(), car.getFrontAxisCenter());
+		Vector fromRearToFront = new Vector(car.getBackAxleCenter(), car.getFrontAxleCenter());
 		Vector fromRightWheelToLeftWheel = fromRearToFront.perpendicular().normalized().multipliedBy(car.getWidth());
 
-		Point rearLeft = car.getBackAxisCenter().add(fromRightWheelToLeftWheel.multipliedBy(0.5));
+		Point rearLeft = car.getBackAxleCenter().add(fromRightWheelToLeftWheel.multipliedBy(0.5));
 		Point frontLeft = rearLeft.add(fromRearToFront);
 		Point frontRight = frontLeft.add(fromRightWheelToLeftWheel.negative());
 		Point rearRight = rearLeft.add(fromRightWheelToLeftWheel.negative());

@@ -138,7 +138,7 @@ public final class PathResolver {
 		// Dubins curves
 		double curvatureRadius = car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).getRotationCircleRadius();
 		Map<DubinsCurveType, DubinsCurveInfo> curves = DubinsCurves.computeCurves(
-				new PositionWithDirection(car.getBackAxisCenter(), car.getOrientationVector()),
+				new PositionWithDirection(car.getBackAxleCenter(), car.getOrientationVector()),
 				new PositionWithDirection(targetPosition.subtract(targetOrientation
 						.normalized().multipliedBy(car.getLength() / 2.0)), targetOrientation),
 				curvatureRadius
@@ -198,12 +198,12 @@ public final class PathResolver {
 		double prevErrorToFinalPoint = Long.MAX_VALUE;
 		while(true) {
 			double currentErrorToFinalPoint =
-					currentCar.getBackAxisCenter().distanceTo(chosenCurveInfo.getSecondCircleTangentPoint());
+					currentCar.getBackAxleCenter().distanceTo(chosenCurveInfo.getSecondCircleTangentPoint());
 			if (currentErrorToFinalPoint > prevErrorToFinalPoint) {
 				break;
 			}
 			prevErrorToFinalPoint = currentErrorToFinalPoint;
-			double error = distanceFromPointToLine(currentCar.getBackAxisCenter(),
+			double error = distanceFromPointToLine(currentCar.getBackAxleCenter(),
 					chosenCurveInfo.getFirstCircleTangentPoint(), chosenCurveInfo.getSecondCircleTangentPoint());
 			int steering = pidController.currentError(error);
 			Movement movement = Movement.FORWARD;
