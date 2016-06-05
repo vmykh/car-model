@@ -117,4 +117,32 @@ public class ThetaStarTest {
 		List<IntegerPoint> expectedPath = asList(start, new IntegerPoint(1, 1), finish);
 		assertEquals(expectedPath, path);
 	}
+
+	/*
+	* * * * * * * * *
+	* * * * * * * * *
+	* * * * * * * * *
+	* * * * * * * * *
+	* * * * x * * * *
+	* s * * * * * f *
+	* * * * x * * * *
+
+
+	 */
+	@Test
+	public void avoidTooNarrowPassages() {
+		Field field = new Field(9, 7);
+		// vertical line of obstacles
+		field.addObstacle(4, 0);
+		field.addObstacle(4, 2);
+
+		IntegerPoint start = new IntegerPoint(1, 1);
+		IntegerPoint finish = new IntegerPoint(7, 1);
+		int minPassageWidth = 3;
+		ThetaStar thetaStar = new ThetaStar(field, start, finish, minPassageWidth);
+		List<IntegerPoint> path = thetaStar.findPath();
+
+		List<IntegerPoint> expectedPath = asList(start, new IntegerPoint(4, 5), finish);
+		assertEquals(expectedPath, path);
+	}
 }
