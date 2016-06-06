@@ -39,4 +39,8 @@ public final class Field {
 		IntegerPoint pos = new IntegerPoint(x, y);
 		return obstacles.contains(pos);
 	}
+
+	public boolean isObstacle(IntegerPoint pos) {
+		return obstacles.contains(pos);
+	}
 }

@@ -11,16 +11,17 @@ public final class LineDrawingUtils {
 	private LineDrawingUtils() {}
 
 	public static Set<IntegerPoint> drawLinePixels(IntegerPoint from, IntegerPoint to, int width) {
+		checkArgument(width >= 1);
+
 		if (from.equals(to)) {
-			// TODO(vmykh): it doesnt seem to be correct
+			// TODO(vmykh): it doesn't seem to be correct
 			throw new RuntimeException();
-//			return Collections.singleton(from);
 		}
 
 		double absDeltaX = abs(to.getX() - from.getX());
 		double absDeltaY = abs(to.getY() - from.getY());
 
-		if (absDeltaX >= absDeltaY) {
+		if (absDeltaX > absDeltaY) {
 			return computePixelsForLine(from, to, width);
 		} else {
 			Set<IntegerPoint> symmetricPixels = computePixelsForLine(copyAndSwapXY(from), copyAndSwapXY(to), width);
@@ -30,6 +31,31 @@ public final class LineDrawingUtils {
 			}
 			return pixels;
 		}
+	}
+
+//	private static Set<IntegerPoint> computePixelsForXYSymmetricLine(IntegerPoint from, IntegerPoint to, int width) {
+//		if (from.getX() > to.getX()) {
+//			IntegerPoint temp = from;
+//			from = to;
+//			to = temp;
+//		}
+//
+//		int adjustedWidth = width % 2 == 0 ? width + 1 : width;
+//		int yShift = (adjustedWidth - 1) / 2;
+//		int currentY = from.getY();
+//		int yStep = to.getY() - from.getY() > 0 ? 1 : -1;
+//		for (int x = from.getX(); x <= to.getX(); x++) {
+//			int minY = currentY - yShift;
+//			int maxY = currentY + yShift;
+//			for (int y = currentY - yShift; y < ; y++) {
+//
+//			}
+//			currentY += yStep;
+//		}
+//	}
+
+	private static boolean numbersAreEqual(double absDeltaX, double absDeltaY, double precision) {
+		return abs(absDeltaX - absDeltaY) < precision;
 	}
 
 	private static Set<IntegerPoint> computePixelsForLine(IntegerPoint from, IntegerPoint to, int width) {
@@ -76,9 +102,12 @@ public final class LineDrawingUtils {
 
 		SortedSet<IntegerPoint> pixelsWithProperLineWidth = new TreeSet<>(new IntegerPointForLineDrawingComparator());
 
-		// TODO(vmykh): consider case of 45 degrees line
+//		TODO(vmykh): consider case of 45 degrees line
 
 		List<List<IntegerPoint>> groupedByX = groupedAndOrderedByX(pixelsOfLineWithWidthOne);
+
+//		List<List<IntegerPoint>> groupedByXAndHandled
+
 
 		for (List<IntegerPoint> pixelsVertical : groupedByX) {
 			if (pixelsVertical.size() == 1) {

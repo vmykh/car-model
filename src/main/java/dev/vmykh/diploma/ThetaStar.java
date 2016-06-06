@@ -80,175 +80,16 @@ public class ThetaStar {
 			return true;
 		}
 
-		int deltaX = abs(to.getX() - from.getX());
-		int deltaY = abs(to.getY() - from.getY());
+		int width = minFreeCellsAtSide * 2 + 1;
+		Set<IntegerPoint> linePixels = LineDrawingUtils.drawLinePixels(from, to, width);
 
-		if (deltaX >= deltaY) {
-			if (from.getX() > to.getX()) {
-				IntegerPoint temp = from;
-				from = to;
-				to = temp;
-			}
-
-			double yCoef = (to.getY() - from.getY()) / (double) deltaX;
-
-			assert abs(yCoef) <= 1.0;
-
-			int y1 = from.getY();
-			int x1 = from.getX();
-			int x2 = to.getX();
-			int prevY = y1;
-			for (int x = x1; x <= x2; x++) {
-				double yReal = y1 + (x - x1) * yCoef;
-				if (hardToRound(yReal)) {
-					int bottomY = (int) floor(yReal);
-					int topY = (int) Math.ceil(yReal);
-					if (cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x, bottomY))
-							|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x, topY))) {
-						return false;
-					}
-
-					if (yCoef >= 0) {
-						prevY = topY;
-					} else {
-						prevY = bottomY;
-					}
-				} else {
-					int y = (int) Math.round(yReal);
-					if (y == prevY) {
-						if (cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x, y))) {
-							return false;
-						}
-					} else {
-						int bottomY = (int) floor(yReal);
-						int topY = (int) Math.ceil(yReal);
-						if (nothingToRound(yReal) && abs(yCoef) > 0.0001) {
-							if (yCoef > 0) {
-								topY = (int) Math.round(yReal);
-								bottomY = topY - 1;
-							} else {
-								bottomY = (int) Math.round(yReal);
-								topY = bottomY + 1;
-							}
-						}
-						if (cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x, bottomY))
-								|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x, topY))
-								|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x - 1, bottomY))
-								|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x - 1, topY))) {
-							return false;
-						}
-					}
-				}
-			}
-		} else {
-			if (from.getY() > to.getY()) {
-				IntegerPoint temp = from;
-				from = to;
-				to = temp;
-			}
-
-			double xCoef = (to.getX() - from.getX()) / (double) deltaY;
-
-			assert abs(xCoef) < 1.0 ;
-
-			int x1 = from.getX();
-			int y1 = from.getY();
-			int y2 = to.getY();
-			int prevX = x1;
-			for (int y = y1; y <= y2; y++) {
-				double xReal = x1 + (y - y1) * xCoef;
-				if (hardToRound(xReal)) {
-					int leftX = (int) floor(xReal);
-					int rightX = (int) Math.ceil(xReal);
-					if (cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(leftX, y))
-							|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(rightX, y))) {
-						return false;
-					}
-
-					if (xCoef >= 0) {
-						prevX = rightX;
-					} else {
-						prevX = leftX;
-					}
-				} else {
-					int x = (int) Math.round(xReal);
-					if (x == prevX) {
-						if (cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(x, y))) {
-							return false;
-						}
-					} else {
-						int leftX = (int) floor(xReal);
-						int rightX = (int) Math.ceil(xReal);
-
-						if (nothingToRound(xReal) && abs(xCoef) > 0.0001) {
-							if (xCoef > 0) {
-								rightX = (int) Math.round(xReal);
-								leftX = rightX - 1;
-							} else {
-								leftX = (int) Math.round(xReal);
-								rightX = leftX + 1;
-							}
-						}
-
-						if (cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(leftX, y))
-								|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(rightX, y))
-								|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(leftX, y - 1))
-								|| cellIsValidAndHaveEnoughSpaceAround(new IntegerPoint(rightX, y - 1))) {
-							return false;
-						}
-					}
-				}
+		for (IntegerPoint linePixel : linePixels) {
+			if (field.isObstacle(linePixel)) {
+				return false;
 			}
 		}
 
 		return true;
-	}
-
-//	// TODO(vmykh): make private
-//	public static List<List<IntegerPoint>> drawLinePixels(IntegerPoint from, IntegerPoint to, int width) {
-//		SortedSet<IntegerPoint> pixels = new TreeSet<>(new IntegerPointForLineDrawingComparator());
-//		double deltaX = to.getX() - from.getX();
-//		double deltaY = to.getY() - from.getY();
-//		double ratio = deltaY / deltaX;
-//
-//		double y = from.getY() + 0.5 - ratio * 0.5;
-//		int iters = to.getX() - from.getX();
-//		for (int i = 0; i < iters; i++) {
-//			y += ratio;
-//
-//			int xLeft = from.getX() + i;
-//			int xRight = xLeft + 1;
-//			if (almostInteger(y)) {
-//				int upperY = (int)round(y);
-//				int bottomY = upperY - 1;
-//				pixels.add(new IntegerPoint(xLeft, bottomY));
-//				pixels.add(new IntegerPoint(xLeft, upperY));
-//				pixels.add(new IntegerPoint(xRight, bottomY));
-//				pixels.add(new IntegerPoint(xRight, upperY));
-//			} else {
-//				int integerY = (int)floor(y);
-//				pixels.add(new IntegerPoint(xLeft, integerY));
-//				pixels.add(new IntegerPoint(xRight, integerY));
-//			}
-//		}
-//
-//		return null;
-//	}
-
-//	private static boolean almostInteger(double x) {
-//		return abs(round(x) - x) < 0.001;
-//	}
-
-	private static boolean hardToRound(double x) {
-		long wholePart = (long) x;
-		double fraction = x - wholePart;
-		return abs(fraction - 0.5) < 0.01;
-	}
-
-	private static boolean nothingToRound(double x) {
-		long wholePart = (long) x;
-		double fraction = x - wholePart;
-		return abs(fraction) < 0.00001;
 	}
 
 	private static double distanceBetween(IntegerPoint p1, IntegerPoint p2) {
@@ -278,6 +119,27 @@ public class ThetaStar {
 		IntegerPoint top = new IntegerPoint(cell.getX(), cell.getY() + 1);
 		if (isValidPathCell(top)) {
 			neighbors.add(top);
+		}
+
+		// diagonal points
+		IntegerPoint bottomLeft = new IntegerPoint(cell.getX() - 1, cell.getY() - 1);
+		if (isValidPathCell(bottomLeft) && lineOfSight(cell, bottomLeft)) {
+			neighbors.add(bottomLeft);
+		}
+
+		IntegerPoint bottomRight = new IntegerPoint(cell.getX() + 1, cell.getY() - 1);
+		if (isValidPathCell(bottomRight) && lineOfSight(cell, bottomRight)) {
+			neighbors.add(bottomRight);
+		}
+
+		IntegerPoint topRight = new IntegerPoint(cell.getX() + 1, cell.getY() + 1);
+		if (isValidPathCell(topRight) && lineOfSight(cell, topRight)) {
+			neighbors.add(topRight);
+		}
+
+		IntegerPoint topLeft = new IntegerPoint(cell.getX() - 1, cell.getY() + 1);
+		if (isValidPathCell(topLeft) && lineOfSight(cell, topLeft)) {
+			neighbors.add(topLeft);
 		}
 
 		return neighbors;
@@ -361,16 +223,4 @@ public class ThetaStar {
 					'}';
 		}
 	}
-
-//	private static final class IntegerPointForLineDrawingComparator implements Comparator<IntegerPoint> {
-//
-//		@Override
-//		public int compare(IntegerPoint p1, IntegerPoint p2) {
-//			if (p1.getX() != p2.getX()) {
-//				return p1.getX() - p2.getX();
-//			} else {
-//				return p1.getY() - p2.getY();
-//			}
-//		}
-//	}
 }
