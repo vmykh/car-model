@@ -17,10 +17,7 @@ import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -36,7 +33,7 @@ public class Main extends Application {
 	private static final double CAR_WIDTH = 45;
 	private static final double CAR_LENGTH = 60;
 
-	private static final double OBSTACLE_SIZE = 25;
+	private static final double OBSTACLE_SIZE = 10;
 
 	private GraphicsContext gc;
 	private Canvas canvas;
@@ -68,7 +65,9 @@ public class Main extends Application {
 
 	private volatile boolean cancelOrdinaryTask = false;
 
-	private List<Obstacle> obstacles = new ArrayList();
+//	private List<Obstacle> obstacles = new ArrayList();
+
+	private Set<IntegerPoint> obstacleset = new HashSet<>();
 
 	private CopyOnWriteArrayList<List<Point>> intermediatePath = new CopyOnWriteArrayList<>();
 	private int drawedSubpathes = 0;
@@ -121,8 +120,8 @@ public class Main extends Application {
 					car = null;
 					target = null;
 					tracePoints.clear();
-					obstacles.clear();
-					collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
+					obstacleset.clear();
+//					collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
 					firstCarPoint = null;
 					secondCarPoint = null;
 					firstTargetPoint = null;
@@ -157,31 +156,59 @@ public class Main extends Application {
 				new EventHandler<MouseEvent>() {
 					@Override
 					public void handle(MouseEvent e) {
+						double mouseX = e.getX();
+						double mouseY = canvas.getHeight() - e.getY();
+
 						if (e.getButton() == MouseButton.PRIMARY) {
+
+
 							if (car == null) {
 								if (firstCarPoint == null) {
-									firstCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+									firstCarPoint = new Point(mouseX, mouseY);
 								} else if (secondCarPoint == null) {
-									secondCarPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+									secondCarPoint = new Point(mouseX, mouseY);
 									car = createCar(firstCarPoint, new Vector(firstCarPoint, secondCarPoint));
 								}
 							}
 							else if (firstTargetPoint == null) {
-								firstTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+								firstTargetPoint = new Point(mouseX, mouseY);
 							} else if (secondTargetPoint == null) {
-								secondTargetPoint = new Point(e.getX(), canvas.getHeight() - e.getY());
+								secondTargetPoint = new Point(mouseX, mouseY);
 								Vector direction = new Vector(firstTargetPoint, secondTargetPoint);
 								createTarget(car, firstTargetPoint, direction);
 							}
-						} else if (e.getButton() == MouseButton.SECONDARY) {
-							obstacles.add(
-									new Obstacle(new Point(e.getX(), canvas.getHeight() - e.getY()),
-									OBSTACLE_SIZE, OBSTACLE_SIZE)
-							);
-							collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
+						}
+//						else if (e.getButton() == MouseButton.SECONDARY) {
+//							obstacleset.add(
+//									new Obstacle(new Point(mouseX, mouseY),
+//									OBSTACLE_SIZE, OBSTACLE_SIZE)
+//							);
+////							collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
+//						}
+					}
+				});
+
+
+		canvas.addEventHandler(MouseEvent.MOUSE_DRAGGED,
+				new EventHandler<MouseEvent>() {
+					@Override
+					public void handle(MouseEvent e) {
+						double mouseX = e.getX();
+						double mouseY = canvas.getHeight() - e.getY();
+
+						if (e.getButton() == MouseButton.SECONDARY) {
+							int obstacleXIndex = (int) floor(mouseX / OBSTACLE_SIZE);
+							int obstacleYIndex = (int) floor(mouseY / OBSTACLE_SIZE);
+							obstacleset.add(new IntegerPoint(obstacleXIndex, obstacleYIndex));
+//							obstacleset.add(
+//									new Obstacle(new Point(mouseX, mouseY),
+//											OBSTACLE_SIZE, OBSTACLE_SIZE)
+//							);
+//							collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
 						}
 					}
 				});
+
 
 
 		timer.schedule(createTimerTask(), 0L);
@@ -246,11 +273,16 @@ public class Main extends Application {
 		drawArrow(arrowBase, arrowHead, lineWidth, lineColor);
 	}
 
-	private void drawObstacle(Obstacle obstacle) {
+	private void drawObstacle(IntegerPoint obstacleIndexes) {
+//		Color color = Color.DARKBLUE;
+//		Vector fromCenterToLeftBottom = new Vector(obstacle.getWidth() / 2.0, obstacle.getHeight() / 2.0).negative();
+//		Point leftBottom = obstacle.getCenter().add(fromCenterToLeftBottom);
+//		fillRect(leftBottom.getX(), leftBottom.getY(), obstacle.getWidth(), obstacle.getHeight(), color);
 		Color color = Color.DARKBLUE;
-		Vector fromCenterToLeftBottom = new Vector(obstacle.getWidth() / 2.0, obstacle.getHeight() / 2.0).negative();
-		Point leftBottom = obstacle.getCenter().add(fromCenterToLeftBottom);
-		fillRect(leftBottom.getX(), leftBottom.getY(), obstacle.getWidth(), obstacle.getHeight(), color);
+//		Vector fromCenterToLeftBottom = new Vector(obstacle.getWidth() / 2.0, obstacle.getHeight() / 2.0).negative();
+//		Point leftBottom = obstacle.getCenter().add(fromCenterToLeftBottom);
+		fillRect(obstacleIndexes.getX() * OBSTACLE_SIZE, obstacleIndexes.getY() * OBSTACLE_SIZE,
+				OBSTACLE_SIZE, OBSTACLE_SIZE, color);
 	}
 
 	private void drawArrow(Point base, Point arrowHead, double width, Color color) {
@@ -402,8 +434,8 @@ public class Main extends Application {
 		drawCar(car);
 		drawTotalDistance(tracePoints);
 
-		for (Obstacle obstacle : obstacles) {
-			drawObstacle(obstacle);
+		for (IntegerPoint obstacleIndexes : obstacleset) {
+			drawObstacle(obstacleIndexes);
 		}
 	}
 
