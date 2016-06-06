@@ -30,15 +30,17 @@ public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
-	private static final double CAR_WIDTH = 45;
-	private static final double CAR_LENGTH = 60;
+	private static final double CHASSIS_WIDTH = 45;
+	private static final double CHASSIS_LENGTH = 60;
+	private static final double BODY_WIDTH = CHASSIS_WIDTH * 1.3;
+	private static final double BODY_LENGTH = CHASSIS_LENGTH * 1.65;
 
 	private static final double OBSTACLE_SIZE = 10;
 
 	private GraphicsContext gc;
 	private Canvas canvas;
 	private volatile Car car =
-			new Car(CAR_WIDTH, CAR_LENGTH)
+			new Car(BODY_WIDTH, BODY_LENGTH, CHASSIS_WIDTH, CHASSIS_LENGTH)
 			.setInitialPosition(250, 250)
 			.setInitialOrientation(PI / 2);
 
@@ -46,7 +48,8 @@ public class Main extends Application {
 
 	private Timer timer = new Timer();
 
-	private CollisionDetector collisionDetector = new CollisionDetector(new ArrayList<>(), CANVAS_WIDTH, CANVAS_HEIGHT);
+	private CollisionDetectorDiscreteField collisionDetector = new CollisionDetectorDiscreteField(
+			new HashSet<>(), OBSTACLE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT);
 
 	private volatile boolean upKeyIsPressed = false;
 	private volatile boolean downKeyIsPressed = false;
@@ -121,7 +124,8 @@ public class Main extends Application {
 					target = null;
 					tracePoints.clear();
 					obstacleset.clear();
-//					collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
+					collisionDetector = new CollisionDetectorDiscreteField(
+							new HashSet<>(), OBSTACLE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT);
 					firstCarPoint = null;
 					secondCarPoint = null;
 					firstTargetPoint = null;
@@ -137,16 +141,16 @@ public class Main extends Application {
 					AtomicReference<List<Movement>> controls = new AtomicReference<>();
 
 					Point targetPosition = target.getPosition().subtract(targetOrientation
-							.normalized().multipliedBy(car.getLength() / 2.0));
+							.normalized().multipliedBy(car.getChassisLength() / 2.0));
 
 					targetTemp = targetPosition;
 
-					executor.execute(() -> {
-						controls.set(new PathResolver(
-							target, collisionDetector, new IntermediatePathPainter()).resolvePath(car));
-						computingPathNow.set(false);
-						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
-					});
+//					executor.execute(() -> {
+//						controls.set(new PathResolver(
+//							target, collisionDetectorDiscreteField, new IntermediatePathPainter()).resolvePath(car));
+//						computingPathNow.set(false);
+//						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
+//					});
 					System.out.println(controls);
 				}
 			}
@@ -178,13 +182,6 @@ public class Main extends Application {
 								createTarget(car, firstTargetPoint, direction);
 							}
 						}
-//						else if (e.getButton() == MouseButton.SECONDARY) {
-//							obstacleset.add(
-//									new Obstacle(new Point(mouseX, mouseY),
-//									OBSTACLE_SIZE, OBSTACLE_SIZE)
-//							);
-////							collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
-//						}
 					}
 				});
 
@@ -200,11 +197,8 @@ public class Main extends Application {
 							int obstacleXIndex = (int) floor(mouseX / OBSTACLE_SIZE);
 							int obstacleYIndex = (int) floor(mouseY / OBSTACLE_SIZE);
 							obstacleset.add(new IntegerPoint(obstacleXIndex, obstacleYIndex));
-//							obstacleset.add(
-//									new Obstacle(new Point(mouseX, mouseY),
-//											OBSTACLE_SIZE, OBSTACLE_SIZE)
-//							);
-//							collisionDetector = new CollisionDetector(obstacles, canvas.getWidth(), canvas.getHeight());
+							collisionDetector = new CollisionDetectorDiscreteField(obstacleset, OBSTACLE_SIZE,
+									CANVAS_WIDTH, CANVAS_HEIGHT);
 						}
 					}
 				});
@@ -232,14 +226,14 @@ public class Main extends Application {
 	}
 
 	private static Car createCar(Point backCenterPoint, Vector direction) {
-		return new Car(CAR_WIDTH, CAR_LENGTH)
-				.setInitialPosition(backCenterPoint.add(direction.normalized().multipliedBy(CAR_LENGTH * 0.5)))
+		return new Car(BODY_WIDTH, BODY_LENGTH, CHASSIS_WIDTH, CHASSIS_LENGTH)
+				.setInitialPosition(backCenterPoint.add(direction.normalized().multipliedBy(CHASSIS_LENGTH * 0.5)))
 				.setInitialOrientation(direction.angle());
 	}
 
 	private void createTarget(Car car, Point backCenterPosition, Vector direction) {
-		double w = car.getWidth();
-		double l = car.getLength();
+		double w = car.getChassisWidth();
+		double l = car.getChassisLength();
 
 		Vector directionNormalized = direction.normalized();
 		Vector perpendicularDirectionNormalized = direction.perpendicular().normalized();
@@ -451,10 +445,41 @@ public class Main extends Application {
 	}
 
 	private void drawCar(Car car) {
+		drawCarChassis(car);
+		drawCarBody(car);
+	}
+
+	private void drawCarBody(Car car) {
+		Point backRightCorner = car.getBackAxleCenter()
+				.add(
+						car.getOrientationVector()
+								.negative()
+								.normalizedTo((car.getBodyLength() - car.getChassisLength()) / 2.0)
+				)
+				.add(
+						car.getOrientationVector()
+								.perpendicular()
+								.negative()
+								.normalizedTo(car.getBodyWidth() / 2.0)
+				);
+
+		Point frontRightCorner = backRightCorner.add(car.getOrientationVector().normalizedTo(car.getBodyLength()));
+		Point frontLeftCorner = frontRightCorner.add(
+				car.getOrientationVector().perpendicular().normalizedTo(car.getBodyWidth()));
+		Point backLeftCorner = backRightCorner.add(
+				car.getOrientationVector().perpendicular().normalizedTo(car.getBodyWidth()));
+
+		drawLine(backRightCorner, frontRightCorner, 3.0, Color.DARKGREEN);
+		drawLine(frontRightCorner, frontLeftCorner, 3.0, Color.DARKGREEN);
+		drawLine(frontLeftCorner, backLeftCorner, 3.0, Color.DARKGREEN);
+		drawLine(backLeftCorner, backRightCorner, 3.0, Color.DARKGREEN);
+	}
+
+	private void drawCarChassis(Car car) {
 		double x = car.getCenter().getX();
 		double y = car.getCenter().getY();
-		double l = car.getLength();
-		double w = car.getWidth();
+		double l = car.getChassisLength();
+		double w = car.getChassisWidth();
 		double orientAngle = car.getOrientationAngle();
 		double frontAxisAngle = car.getSteeringAngle();
 

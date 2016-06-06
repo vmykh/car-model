@@ -5,19 +5,27 @@ import org.apache.commons.math3.linear.*;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Math.*;
 
 public final class Car {
-	private final double width;
-	private final double length;
+	private final double bodyWidth;
+	private final double bodyLength;
+	private final double chassisWidth;
+	private final double chassisLength;
 	private double x;
 	private double y;
 	private double orientationAngle;
 	private double steeringAngle;
 
-	public Car(double width, double length) {
-		this.width = width;
-		this.length = length;
+	public Car(double bodyWidth, double bodyLength, double chassisWidth, double chassisLength) {
+		checkArgument(bodyWidth > chassisWidth);
+		checkArgument(bodyLength > chassisLength);
+
+		this.bodyWidth = bodyWidth;
+		this.bodyLength = bodyLength;
+		this.chassisWidth = chassisWidth;
+		this.chassisLength = chassisLength;
 	}
 
 	public Car setInitialPosition(double x, double y) {
@@ -42,12 +50,12 @@ public final class Car {
 		return this;
 	}
 
-	public double getWidth() {
-		return width;
+	public double getChassisWidth() {
+		return chassisWidth;
 	}
 
-	public double getLength() {
-		return length;
+	public double getChassisLength() {
+		return chassisLength;
 	}
 
 	public double getX() {
@@ -64,7 +72,14 @@ public final class Car {
 				new Vector(getBackAxleCenter(), getFrontAxleCenter())
 						.multipliedBy(0.5)
 		);
-//		return new Point(x, y);
+	}
+
+	public double getBodyWidth() {
+		return bodyWidth;
+	}
+
+	public double getBodyLength() {
+		return bodyLength;
 	}
 
 	public double getOrientationAngle() {
@@ -80,7 +95,7 @@ public final class Car {
 	}
 
 	public Car withFrontAxisAngle(double frontAxisAngle) {
-		Car car = new Car(width, length);
+		Car car = new Car(bodyWidth, bodyLength, chassisWidth, chassisLength);
 		car.setInitialPosition(x, y);
 		car.setInitialOrientation(orientationAngle);
 		car.setInitialSteeringAngle(frontAxisAngle);
@@ -116,7 +131,7 @@ public final class Car {
 			newOrientationAngle = orientationAngle + rotationAngle;
 		}
 
-		Car movedCar = new Car(width, length);
+		Car movedCar = new Car(bodyWidth, bodyLength, chassisWidth, chassisLength);
 		movedCar.setInitialPosition(newX, newY);
 		movedCar.setInitialOrientation(newOrientationAngle);
 		movedCar.setInitialSteeringAngle(steeringAngle);
@@ -189,7 +204,7 @@ public final class Car {
 	}
 
 	public Point getFrontAxleCenter() {
-		return getBackAxleCenter().add(Vector.fromAngle(orientationAngle).normalized().multipliedBy(length));
+		return getBackAxleCenter().add(Vector.fromAngle(orientationAngle).normalized().multipliedBy(chassisLength));
 	}
 
 	@Override

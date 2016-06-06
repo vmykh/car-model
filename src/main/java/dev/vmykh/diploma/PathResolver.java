@@ -16,18 +16,18 @@ public final class PathResolver {
 
 	private final Point targetPosition;
 	private final Vector targetOrientation;
-	private final CollisionDetector collisionDetector;
+	private final CollisionDetectorDiscreteField collisionDetectorDiscreteField;
 
 	private static final int WEIGHT_CELL_SIZE = 3;
 	private final Map<IntegerPoint, CellWeight> weights = new HashMap<>();
 
 	private final PathResolverListener listener;
 
-	public PathResolver(PositionWithDirection target, CollisionDetector collisionDetector,
+	public PathResolver(PositionWithDirection target, CollisionDetectorDiscreteField collisionDetectorDiscreteField,
 	                    PathResolverListener listener) {
 		this.targetPosition = target.getPosition();
 		this.targetOrientation = target.getDirection();
-		this.collisionDetector = collisionDetector;
+		this.collisionDetectorDiscreteField = collisionDetectorDiscreteField;
 		this.listener = listener;
 	}
 
@@ -140,7 +140,7 @@ public final class PathResolver {
 		Map<DubinsCurveType, DubinsCurveInfo> curves = DubinsCurves.computeCurves(
 				new PositionWithDirection(car.getBackAxleCenter(), car.getOrientationVector()),
 				new PositionWithDirection(targetPosition.subtract(targetOrientation
-						.normalized().multipliedBy(car.getLength() / 2.0)), targetOrientation),
+						.normalized().multipliedBy(car.getChassisLength() / 2.0)), targetOrientation),
 				curvatureRadius
 				);
 		
@@ -271,7 +271,7 @@ public final class PathResolver {
 
 	private CarState moveForward(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(0.0).movedBy(ONE_STEP_DISTANCE);
-		if (collisionDetector.collides(movedCar)) {
+		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
 		}
 		return new CarState(
@@ -284,7 +284,7 @@ public final class PathResolver {
 
 	private CarState moveForwardLeft(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
-		if (collisionDetector.collides(movedCar)) {
+		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
 		}
 		return new CarState(
@@ -297,7 +297,7 @@ public final class PathResolver {
 
 	private CarState moveForwardRight(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
-		if (collisionDetector.collides(movedCar)) {
+		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
 		}
 		return new CarState(
@@ -310,7 +310,7 @@ public final class PathResolver {
 
 	private CarState moveBackward(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(0.0).movedBy(-ONE_STEP_DISTANCE);
-		if (collisionDetector.collides(movedCar)) {
+		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
 		}
 		return new CarState(
@@ -323,7 +323,7 @@ public final class PathResolver {
 
 	private CarState moveBackwardLeft(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
-		if (collisionDetector.collides(movedCar)) {
+		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
 		}
 		return new CarState(
@@ -336,7 +336,7 @@ public final class PathResolver {
 
 	private CarState moveBackwardRight(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
-		if (collisionDetector.collides(movedCar)) {
+		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
 		}
 		return new CarState(

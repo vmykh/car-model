@@ -1,5 +1,6 @@
 package dev.vmykh.diploma;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Math.*;
 
 public final class Vector {
@@ -43,6 +44,15 @@ public final class Vector {
 
 	public Vector normalized() {
 		return new Vector(x / length(), y / length());
+	}
+
+	public Vector normalizedTo(double magnitude) {
+		checkArgument(magnitude >= 0);
+
+		return new Vector(
+				magnitude * (x / length()),
+				magnitude * (y / length())
+		);
 	}
 
 	public Vector perpendicular() {
