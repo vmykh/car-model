@@ -30,8 +30,8 @@ public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
-	private static final double CHASSIS_WIDTH = 45;
-	private static final double CHASSIS_LENGTH = 60;
+	private static final double CHASSIS_WIDTH = 15;
+	private static final double CHASSIS_LENGTH = 20;
 	private static final double BODY_WIDTH = CHASSIS_WIDTH * 1.3;
 	private static final double BODY_LENGTH = CHASSIS_LENGTH * 1.65;
 
@@ -133,24 +133,26 @@ public class Main extends Application {
 				} else if (event.getCode() == KeyCode.P && event.getEventType() == KeyEvent.KEY_RELEASED) {
 					Point targetCenter = target.get(0).add(new Vector(target.get(0), target.get(2)).multipliedBy(0.5));
 					Vector targetOrientation = new Vector(target.get(0), target.get(1));
-					PositionWithDirection target = new PositionWithDirection(targetCenter, targetOrientation);
+					Point targetBackCenter = targetCenter.subtract(targetOrientation
+							.normalized().multipliedBy(car.getChassisLength() / 2.0));
+					PositionWithDirection target = new PositionWithDirection(targetBackCenter, targetOrientation);
 					computingPathNow.set(true);
 					cancelOrdinaryTask = true;
 					intermediatePath.clear();
 					Executor executor = Executors.newSingleThreadExecutor();
 					AtomicReference<List<Movement>> controls = new AtomicReference<>();
 
-					Point targetPosition = target.getPosition().subtract(targetOrientation
-							.normalized().multipliedBy(car.getChassisLength() / 2.0));
+//					Point targetPosition = target.getPosition().subtract(targetOrientation
+//							.normalized().multipliedBy(car.getChassisLength() / 2.0));
 
-					targetTemp = targetPosition;
+					targetTemp = targetBackCenter;
 
-//					executor.execute(() -> {
-//						controls.set(new PathResolver(
-//							target, collisionDetectorDiscreteField, new IntermediatePathPainter()).resolvePath(car));
-//						computingPathNow.set(false);
-//						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
-//					});
+					executor.execute(() -> {
+						controls.set(new PathResolver(
+							target, collisionDetector, new IntermediatePathPainter()).resolvePath(car));
+						computingPathNow.set(false);
+						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
+					});
 					System.out.println(controls);
 				}
 			}
