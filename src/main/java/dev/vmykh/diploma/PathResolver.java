@@ -9,7 +9,7 @@ public final class PathResolver {
 	public static final double ONE_STEP_DISTANCE = 5.0;
 	public static final double FRONT_AXIS_ROTATION_ANGLE = PI / 8.0;
 	public static final double ACCEPTABLE_FINISH_POSITION_ERROR = 10.0;
-	private static final int WEIGHTED_DIRECTIONS_PER_CELL = 16;
+	private static final int WEIGHTED_DIRECTIONS_PER_CELL = 32;
 
 	public static final double ACCEPTABLE_HEURISTIC_DIFFERENCE = 50.0;
 
@@ -42,29 +42,8 @@ public final class PathResolver {
 	public List<Movement> resolvePath(Car car) {
 		// experimental theta *
 
-		int startXIndex = (int) floor(car.getX() / obstacleSize);
-		int startYIndex = (int) floor(car.getY() / obstacleSize);
-		IntegerPoint start = new IntegerPoint(startXIndex, startYIndex);
-
-		int finishXIndex = (int) floor(targetPosition.getX() / obstacleSize);
-		int finishYIndex = (int) floor(targetPosition.getY() / obstacleSize);
-		IntegerPoint finish = new IntegerPoint(finishXIndex, finishYIndex);
-
-		int minPassageWidth = (int)ceil(car.getBodyWidth() / obstacleSize);
-		ThetaStar thetaStar = new ThetaStar(field, start, finish, minPassageWidth);
-
-		List<IntegerPoint> pathInteger = thetaStar.findPath();
-		List<Point> pathReal = new ArrayList<>(pathInteger.size());
-		for (IntegerPoint integerPoint : pathInteger) {
-			double x = integerPoint.getX() * obstacleSize;
-			double y = integerPoint.getY() * obstacleSize;
-			pathReal.add(new Point(x, y));
-		}
-		listener.thetaStarPoints(pathReal);
-
-		if (true) {
-			return new ArrayList<>();
-		}
+//		List<Point> thetaStarPath = computeThetaStarPath(car);
+//		listener.thetaStarPoints(thetaStarPath);
 
 //		try {
 //			Thread.sleep(Long.MAX_VALUE);
@@ -77,7 +56,8 @@ public final class PathResolver {
 		List<Point> discardedStates = new ArrayList<>();
 		int iterations = 0;
 		int skippedIterations = 0;
-		while (computeDistanceToTarget(currentState.getCar()) > ACCEPTABLE_FINISH_POSITION_ERROR) {
+		while (computeDistanceToTarget(currentState.getCar()) > ACCEPTABLE_FINISH_POSITION_ERROR
+				||(abs(orientationError(currentState.getCar())) > PI / 8)) {
 //			if (iterations > 10_000) {
 //				System.out.println("bangura");
 //			}
@@ -292,6 +272,44 @@ public final class PathResolver {
 
 		return controls;
 	}
+//
+//	private boolean carOrientationIsProper(Car car, double precision) {
+//		double carAngle = car.getOrientationAngle();
+//		double targetAngle = targetOrientation.angle();
+//
+//		double deltaAngle = atan2(sin(carAngle - targetAngle), cos(carAngle - targetAngle));
+//		return abs(deltaAngle) < precision;
+//	}
+
+	private double orientationError(Car car) {
+		double carAngle = car.getOrientationAngle();
+		double targetAngle = targetOrientation.angle();
+
+		return atan2(sin(carAngle - targetAngle), cos(carAngle - targetAngle));
+	}
+
+
+	private List<Point> computeThetaStarPath(Car car) {
+		int startXIndex = (int) floor(car.getX() / obstacleSize);
+		int startYIndex = (int) floor(car.getY() / obstacleSize);
+		IntegerPoint start = new IntegerPoint(startXIndex, startYIndex);
+
+		int finishXIndex = (int) floor(targetPosition.getX() / obstacleSize);
+		int finishYIndex = (int) floor(targetPosition.getY() / obstacleSize);
+		IntegerPoint finish = new IntegerPoint(finishXIndex, finishYIndex);
+
+		int minPassageWidth = (int)ceil(car.getBodyWidth() / obstacleSize);
+		ThetaStar thetaStar = new ThetaStar(field, start, finish, minPassageWidth);
+
+		List<IntegerPoint> pathInteger = thetaStar.findPath();
+		List<Point> pathReal = new ArrayList<>(pathInteger.size());
+		for (IntegerPoint integerPoint : pathInteger) {
+			double x = integerPoint.getX() * obstacleSize;
+			double y = integerPoint.getY() * obstacleSize;
+			pathReal.add(new Point(x, y));
+		}
+		return pathReal;
+	}
 
 	private static double distanceFromPointToLine(Point point, Point linePoint1, Point linePoint2) {
 		return (
@@ -411,7 +429,15 @@ public final class PathResolver {
 		double orientationWeight = abs(car.getOrientationAngle() - fromCarToTarget.angle()) * 20;
 
 //		return computeDistanceToTarget(car) + positionWeight + orientationWeight;
-		return computeDistanceToTarget(car) + carState.getPreviousDistance() + positionWeight;
+
+		double distanceToTarget = computeDistanceToTarget(car);
+
+		double finalOrientationError = abs(orientationError(car));
+		double orientationErrorCoef = 5;
+		double orientationErrorWeight = orientationErrorCoef / distanceToTarget;
+		double orientationErrorTerm = finalOrientationError * orientationErrorWeight;
+
+		return distanceToTarget + carState.getPreviousDistance() + positionWeight + orientationErrorTerm;
 	}
 
 	private double computeDistanceToTarget(Car car) {
