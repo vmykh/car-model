@@ -3,8 +3,7 @@ package dev.vmykh.diploma;
 import java.util.*;
 
 import static dev.vmykh.diploma.DubinsCurveType.*;
-import static java.lang.Math.PI;
-import static java.lang.Math.abs;
+import static java.lang.Math.*;
 
 public final class PathResolver {
 	public static final double ONE_STEP_DISTANCE = 5.0;
@@ -23,15 +22,56 @@ public final class PathResolver {
 
 	private final PathResolverListener listener;
 
+	private final Field field;
+	private final double obstacleSize;
+
 	public PathResolver(PositionWithDirection target, CollisionDetectorDiscreteField collisionDetectorDiscreteField,
-	                    PathResolverListener listener) {
+	                    Set<IntegerPoint> obstacles, double worldWidth, double worldHeight,
+	                    double obstacleSize, PathResolverListener listener) {
 		this.targetPosition = target.getPosition();
 		this.targetOrientation = target.getDirection();
 		this.collisionDetectorDiscreteField = collisionDetectorDiscreteField;
 		this.listener = listener;
+
+		this.obstacleSize = obstacleSize;
+		int fieldWidth = (int)(worldWidth / obstacleSize);
+		int fieldHeight = (int)(worldHeight / obstacleSize);
+		this.field = new Field(fieldWidth, fieldHeight, obstacles);
 	}
 
 	public List<Movement> resolvePath(Car car) {
+		// experimental theta *
+
+		int startXIndex = (int) floor(car.getX() / obstacleSize);
+		int startYIndex = (int) floor(car.getY() / obstacleSize);
+		IntegerPoint start = new IntegerPoint(startXIndex, startYIndex);
+
+		int finishXIndex = (int) floor(targetPosition.getX() / obstacleSize);
+		int finishYIndex = (int) floor(targetPosition.getY() / obstacleSize);
+		IntegerPoint finish = new IntegerPoint(finishXIndex, finishYIndex);
+
+		int minPassageWidth = (int)ceil(car.getBodyWidth() / obstacleSize);
+		ThetaStar thetaStar = new ThetaStar(field, start, finish, minPassageWidth);
+
+		List<IntegerPoint> pathInteger = thetaStar.findPath();
+		List<Point> pathReal = new ArrayList<>(pathInteger.size());
+		for (IntegerPoint integerPoint : pathInteger) {
+			double x = integerPoint.getX() * obstacleSize;
+			double y = integerPoint.getY() * obstacleSize;
+			pathReal.add(new Point(x, y));
+		}
+		listener.thetaStarPoints(pathReal);
+
+		if (true) {
+			return new ArrayList<>();
+		}
+
+//		try {
+//			Thread.sleep(Long.MAX_VALUE);
+//		} catch (InterruptedException e) {
+//			throw new RuntimeException(e);
+//		}
+
 		PriorityQueue<CarState> states = new PriorityQueue<>();
 		CarState currentState = new CarState(car, null, null, car.getBackAxleCenter().distanceTo(targetPosition), 0);
 		List<Point> discardedStates = new ArrayList<>();

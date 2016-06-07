@@ -4,4 +4,6 @@ import java.util.List;
 
 public interface PathResolverListener {
 	void intermediatePoints(List<Point> points);
+
+	void thetaStarPoints(List<Point> points);
 }

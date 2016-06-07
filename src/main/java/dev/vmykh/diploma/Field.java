@@ -10,11 +10,18 @@ import static com.google.common.base.Preconditions.checkArgument;
 public final class Field {
 	private final int width;
 	private final int height;
-	private final Set<IntegerPoint> obstacles = new HashSet<>();
+	private final Set<IntegerPoint> obstacles;
 
 	public Field(int width, int height) {
 		this.width = width;
 		this.height = height;
+		obstacles = new HashSet<>();
+	}
+
+	public Field(int width, int height, Set<IntegerPoint> obstacles) {
+		this.width = width;
+		this.height = height;
+		this.obstacles = new HashSet<>(obstacles);
 	}
 
 	public int getWidth() {

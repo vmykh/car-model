@@ -30,8 +30,8 @@ public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
-	private static final double CHASSIS_WIDTH = 15;
-	private static final double CHASSIS_LENGTH = 20;
+	private static final double CHASSIS_WIDTH = 30;
+	private static final double CHASSIS_LENGTH = 40;
 	private static final double BODY_WIDTH = CHASSIS_WIDTH * 1.3;
 	private static final double BODY_LENGTH = CHASSIS_LENGTH * 1.65;
 
@@ -75,6 +75,8 @@ public class Main extends Application {
 	private CopyOnWriteArrayList<List<Point>> intermediatePath = new CopyOnWriteArrayList<>();
 	private int drawedSubpathes = 0;
 	private final AtomicBoolean computingPathNow = new AtomicBoolean(false);
+
+	private CopyOnWriteArrayList<List<Point>> thetaStarPaths = new CopyOnWriteArrayList<>();
 
 	@Override
 	public void start(Stage stage) {
@@ -124,6 +126,9 @@ public class Main extends Application {
 					target = null;
 					tracePoints.clear();
 					obstacleset.clear();
+
+					thetaStarPaths.clear();
+
 					collisionDetector = new CollisionDetectorDiscreteField(
 							new HashSet<>(), OBSTACLE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT);
 					firstCarPoint = null;
@@ -149,7 +154,8 @@ public class Main extends Application {
 
 					executor.execute(() -> {
 						controls.set(new PathResolver(
-							target, collisionDetector, new IntermediatePathPainter()).resolvePath(car));
+							target, collisionDetector, obstacleset, CANVAS_WIDTH, CANVAS_HEIGHT,
+								OBSTACLE_SIZE,  new IntermediatePathPainter()).resolvePath(car));
 						computingPathNow.set(false);
 						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
 					});
@@ -368,6 +374,8 @@ public class Main extends Application {
 //						}
 
 
+
+
 						if (computingPathNow.get()) {
 							if (drawedSubpathes < intermediatePath.size()) {
 								List<Point> subpath = intermediatePath.get(drawedSubpathes++);
@@ -424,6 +432,20 @@ public class Main extends Application {
 
 		if (targetTemp != null) {
 			drawCircle(targetTemp, 5.0, Color.AZURE);
+		}
+
+		for (List<Point> path : thetaStarPaths) {
+			if (path.size() >= 2) {
+				Point prev = path.get(0);
+				for (int i = 1; i < path.size(); i++) {
+					Point current = path.get(i);
+					drawLine(prev, current, 3, Color.GREENYELLOW);
+					prev = current;
+				}
+			}
+			for (Point point : path) {
+				drawCircle(point, 5, Color.CORAL);
+			}
 		}
 
 		drawTraсe(tracePoints);
@@ -585,6 +607,11 @@ public class Main extends Application {
 						intermediatePath.add(copy);
 					}
 			);
+		}
+
+		@Override
+		public void thetaStarPoints(List<Point> points) {
+			thetaStarPaths.add(new ArrayList<>(points));
 		}
 	}
 
