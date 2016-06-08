@@ -30,8 +30,8 @@ public class Main extends Application {
 	private static final int CANVAS_WIDTH = 700;
 	private static final int CANVAS_HEIGHT = 700;
 
-	private static final double CHASSIS_WIDTH = 30;
-	private static final double CHASSIS_LENGTH = 40;
+	private static final double CHASSIS_WIDTH = 15;
+	private static final double CHASSIS_LENGTH = 20;
 	private static final double BODY_WIDTH = CHASSIS_WIDTH * 1.3;
 	private static final double BODY_LENGTH = CHASSIS_LENGTH * 1.65;
 
@@ -158,7 +158,17 @@ public class Main extends Application {
 							target, collisionDetector, obstacleset, CANVAS_WIDTH, CANVAS_HEIGHT,
 								OBSTACLE_SIZE,  new IntermediatePathPainter()).resolvePath(car));
 						computingPathNow.set(false);
-						timer.schedule(createTimerTaskAutonomousDriving(controls.get()), 25L);
+
+
+						List<Movement> tripledControls = new LinkedList<Movement>();
+						for (Movement movement : controls.get()) {
+							tripledControls.add(movement);
+							tripledControls.add(movement);
+							tripledControls.add(movement);
+						}
+
+
+						timer.schedule(createTimerTaskAutonomousDriving(tripledControls), 25L);
 					});
 					System.out.println(controls);
 				}
@@ -205,12 +215,38 @@ public class Main extends Application {
 						if (e.getButton() == MouseButton.SECONDARY) {
 							int obstacleXIndex = (int) floor(mouseX / OBSTACLE_SIZE);
 							int obstacleYIndex = (int) floor(mouseY / OBSTACLE_SIZE);
-							obstacleset.add(new IntegerPoint(obstacleXIndex, obstacleYIndex));
+							IntegerPoint point = new IntegerPoint(obstacleXIndex, obstacleYIndex);
+							obstacleset.add(point);
 							collisionDetector = new CollisionDetectorDiscreteField(obstacleset, OBSTACLE_SIZE,
 									CANVAS_WIDTH, CANVAS_HEIGHT);
 						}
 					}
 				});
+
+
+
+		canvas.addEventHandler(MouseEvent.MOUSE_CLICKED,
+				new EventHandler<MouseEvent>() {
+					@Override
+					public void handle(MouseEvent e) {
+						double mouseX = e.getX();
+						double mouseY = canvas.getHeight() - e.getY();
+
+						if (e.getButton() == MouseButton.SECONDARY) {
+							int obstacleXIndex = (int) floor(mouseX / OBSTACLE_SIZE);
+							int obstacleYIndex = (int) floor(mouseY / OBSTACLE_SIZE);
+							IntegerPoint point = new IntegerPoint(obstacleXIndex, obstacleYIndex);
+							if (obstacleset.contains(point)) {
+								obstacleset.remove(point);
+							}
+							collisionDetector = new CollisionDetectorDiscreteField(obstacleset, OBSTACLE_SIZE,
+									CANVAS_WIDTH, CANVAS_HEIGHT);
+						}
+					}
+				});
+
+
+
 
 
 
@@ -251,8 +287,8 @@ public class Main extends Application {
 	}
 
 	private void createTarget(Car car, Point backCenterPosition, Vector direction) {
-		double w = car.getChassisWidth();
-		double l = car.getChassisLength();
+		double w = car.getBodyWidth();
+		double l = car.getBodyLength();
 
 		Vector directionNormalized = direction.normalized();
 		Vector perpendicularDirectionNormalized = direction.perpendicular().normalized();
@@ -333,29 +369,35 @@ public class Main extends Application {
 					public void run() {
 						if (!movements.isEmpty()) {
 							Movement currentMovement = movements.get(0);
+
+							// TODO(vmykh): refactor this shit
+							int divider = 3;
+							double distance =  (1.25 * car.getChassisLength() / divider);
+
+
 							if (currentMovement != null) {
 								switch (currentMovement) {
 									case FORWARD:
-										car = car.withFrontAxisAngle(0.0).movedBy(PathResolver.ONE_STEP_DISTANCE);
+										car = car.withFrontAxisAngle(0.0).movedBy(distance);
 										break;
 									case FORWARD_LEFT:
 										car = car.withFrontAxisAngle(PathResolver.FRONT_AXIS_ROTATION_ANGLE)
-												.movedBy(PathResolver.ONE_STEP_DISTANCE);
+												.movedBy(distance);
 										break;
 									case FORWARD_RIGHT:
 										car = car.withFrontAxisAngle(-PathResolver.FRONT_AXIS_ROTATION_ANGLE)
-												.movedBy(PathResolver.ONE_STEP_DISTANCE);
+												.movedBy(distance);
 										break;
 									case BACKWARD:
-										car = car.withFrontAxisAngle(0.0).movedBy(-PathResolver.ONE_STEP_DISTANCE);
+										car = car.withFrontAxisAngle(0.0).movedBy(-distance);
 										break;
 									case BACKWARD_LEFT:
 										car = car.withFrontAxisAngle(PathResolver.FRONT_AXIS_ROTATION_ANGLE)
-												.movedBy(-PathResolver.ONE_STEP_DISTANCE);
+												.movedBy(-distance);
 										break;
 									case BACKWARD_RIGHT:
 										car = car.withFrontAxisAngle(-PathResolver.FRONT_AXIS_ROTATION_ANGLE)
-												.movedBy(-PathResolver.ONE_STEP_DISTANCE);
+												.movedBy(-distance);
 										break;
 								}
 							}

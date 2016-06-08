@@ -1,5 +1,6 @@
 package dev.vmykh.diploma;
 
+import javax.swing.text.Position;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -8,18 +9,22 @@ import static java.lang.Math.*;
 import static java.util.Arrays.asList;
 
 public final class PathResolver {
-	public static final double ONE_STEP_DISTANCE = 50.0;
+	public double ONE_STEP_DISTANCE;
 	public static final double FRONT_AXIS_ROTATION_ANGLE = PI / 8.0;
-	public static final double ACCEPTABLE_FINISH_POSITION_ERROR = 30.0;
+//	public static final double ACCEPTABLE_FINISH_POSITION_ERROR = 30.0;
 	private static final int WEIGHTED_DIRECTIONS_PER_CELL = 32;
 
-	public static final double ACCEPTABLE_HEURISTIC_DIFFERENCE = 50.0;
+	public double ACCEPTABLE_HEURISTIC_DIFFERENCE;
 
 	private final Point targetPosition;
 	private final Vector targetOrientation;
 	private final CollisionDetectorDiscreteField collisionDetectorDiscreteField;
 
-	private static final int WEIGHT_CELL_SIZE = 50;
+
+//	private final Point localTargetPosition;
+//	private final Vector localtargetOrientation;
+
+	private int WEIGHT_CELL_SIZE;
 	private final Map<IntegerPoint, CellWeight> weights = new HashMap<>();
 
 	private final PathResolverListener listener;
@@ -47,6 +52,11 @@ public final class PathResolver {
 		List<Point> thetaStarPath = computeThetaStarPath(car);
 		listener.thetaStarPoints(thetaStarPath);
 
+
+		ONE_STEP_DISTANCE = car.getChassisLength() * 1.25;
+		ACCEPTABLE_HEURISTIC_DIFFERENCE = ONE_STEP_DISTANCE;
+		WEIGHT_CELL_SIZE = (int)ONE_STEP_DISTANCE;
+
 //		if (true) {
 //			return new ArrayList<>();
 //		}
@@ -63,153 +73,56 @@ public final class PathResolver {
 
 		for (int i = 1; i < thetaStarPath.size() - 1; i++) {
 			Point previous = thetaStarPath.get(i - 1);
-			Point current =  thetaStarPath.get(i);
-			Point next =  thetaStarPath.get(i + 1);
-			Point targetPosition = current;
-			Vector targetDirection = new Vector(previous, targetPosition).add(new Vector(targetPosition, next));
+			Point current = thetaStarPath.get(i);
+			Point next = thetaStarPath.get(i + 1);
+			Vector targetDirection = new Vector(previous, current).add(new Vector(current, next));
+			Point targetPosition = current.add(targetDirection.perpendicular().normalizedTo(ONE_STEP_DISTANCE));
 
-			double positionAcceptableError = 30;
-			double directionAcceptableError = 30;
-			CarState finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetDirection,
-					positionAcceptableError, directionAcceptableError);
+			double positionAcceptableError = ONE_STEP_DISTANCE * 2;
+			double directionAcceptableError = PI / 10;
+
+			CarState finalState;
+
+			try {
+				finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetDirection,
+						positionAcceptableError, directionAcceptableError);
+			} catch (IllegalStateException e) {
+				return new ArrayList<>();
+			}
+					;
 			currentStartCar = finalState.getCar();
 
-
+			List<Movement> subpathControls = new LinkedList<>();
 			CarState currentState = finalState;
-			controls.add(0, currentState.getCausedMovement());
+			subpathControls.add(0, currentState.getCausedMovement());
 			while (currentState.getPreviousCarState() != null) {
 				currentState = currentState.getPreviousCarState();
-				controls.add(0, currentState.getCausedMovement());
+				subpathControls.add(0, currentState.getCausedMovement());
 			}
+			controls.addAll(subpathControls);
 
-//			Point currentTarget
-
-
-
-			// go reverse
-//			List<Movement> controls = new LinkedList<>();
-//			controls.add(0, currentState.getCausedMovement());
-//			while (currentState.getPreviousCarState() != null) {
-//				currentState = currentState.getPreviousCarState();
-//				controls.add(0, currentState.getCausedMovement());
-//			}
 		}
 
+		double positionAcceptableError = ONE_STEP_DISTANCE;
+		double directionAcceptableError = PI / 16;
 
-//		// Dubins curves
-//		double curvatureRadius = car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).getRotationCircleRadius();
-//		Map<DubinsCurveType, DubinsCurveInfo> curves = DubinsCurves.computeCurves(
-//				new PositionWithDirection(car.getBackAxleCenter(), car.getOrientationVector()),
-//				new PositionWithDirection(targetPosition.subtract(targetOrientation
-//						.normalized().multipliedBy(car.getChassisLength() / 2.0)), targetOrientation),
-//				curvatureRadius
-//				);
-//
-//
-//		DubinsCurveType chosenCurveType = null;
-//		DubinsCurveInfo chosenCurveInfo = null;
-//		for (DubinsCurveType currentCurveType : curves.keySet()) {
-//			DubinsCurveInfo currentCurveInfo = curves.get(currentCurveType);
-//			if (chosenCurveType == null) {
-//				chosenCurveType = currentCurveType;
-//				chosenCurveInfo = curves.get(currentCurveType);
-//			} else if (currentCurveInfo.getPathLength() < chosenCurveInfo.getPathLength()) {
-//				chosenCurveInfo = currentCurveInfo;
-//				chosenCurveType = currentCurveType;
-//			}
-//		}
-//
-//
-//
-//		int iter = 0;
-//		Vector straightLineVector = new Vector(
-//				chosenCurveInfo.getFirstCircleTangentPoint(),
-//				chosenCurveInfo.getSecondCircleTangentPoint()
-//		);
-//		List<Movement> controls = new ArrayList<>();
-//
-//		double firstPartFrontAxisAngle;
-//		Movement firstPartMovement;
-//		if (chosenCurveType == RSR || chosenCurveType == RSL) {
-//			firstPartFrontAxisAngle = -FRONT_AXIS_ROTATION_ANGLE;
-//			firstPartMovement = Movement.FORWARD_RIGHT;
-//		} else if (chosenCurveType == LSL || chosenCurveType == LSR) {
-//			firstPartFrontAxisAngle = FRONT_AXIS_ROTATION_ANGLE;
-//			firstPartMovement = Movement.FORWARD_LEFT;
-//		} else {
-//			throw new RuntimeException("Illegal curve type");
-//		}
-//
-//		Car currentCar = car.withFrontAxisAngle(firstPartFrontAxisAngle);
-//		double straightDirectionAngle = straightLineVector.angle();
-//		while(abs(currentCar.getOrientationAngle() - straightDirectionAngle) > 0.05) {
-//			currentCar = currentCar.movedBy(ONE_STEP_DISTANCE);
-//			controls.add(firstPartMovement);
-//			iter++;
-//			if (iter > 2000) {
-//				return controls;
-//			}
-//		}
-//
-//
-//
-//
-//		currentCar = currentCar.withFrontAxisAngle(0.0);
-//		PIDController pidController = new PIDController(1.0, 5.0, 0.0, 1.5);
-//		double prevErrorToFinalPoint = Long.MAX_VALUE;
-//		while(true) {
-//			double currentErrorToFinalPoint =
-//					currentCar.getBackAxleCenter().distanceTo(chosenCurveInfo.getSecondCircleTangentPoint());
-//			if (currentErrorToFinalPoint > prevErrorToFinalPoint) {
-//				break;
-//			}
-//			prevErrorToFinalPoint = currentErrorToFinalPoint;
-//			double error = distanceFromPointToLine(currentCar.getBackAxleCenter(),
-//					chosenCurveInfo.getFirstCircleTangentPoint(), chosenCurveInfo.getSecondCircleTangentPoint());
-//			int steering = pidController.currentError(error);
-//			Movement movement = Movement.FORWARD;
-//			currentCar = currentCar.withFrontAxisAngle(0.0);
-//			if (steering == 1) {
-//				movement = Movement.FORWARD_LEFT;
-//				currentCar = currentCar.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE);
-//			} else if (steering == -1) {
-//				movement = Movement.FORWARD_RIGHT;
-//				currentCar = currentCar.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE);
-//			}
-//			currentCar = currentCar.movedBy(ONE_STEP_DISTANCE);
-//			controls.add(movement);
-//			iter++;
-//			if (iter > 2000) {
-//				return controls;
-//			}
-//		}
-//
-//
-//
-//
-////		double acceptableError = 1.5;
-//		double secondPartFrontAxisAngle;
-//		Movement secondPartMovement;
-//		if (chosenCurveType == RSR || chosenCurveType == LSR) {
-//			secondPartFrontAxisAngle = -FRONT_AXIS_ROTATION_ANGLE;
-//			secondPartMovement = Movement.FORWARD_RIGHT;
-//		} else if (chosenCurveType == LSL || chosenCurveType == RSL) {
-//			secondPartFrontAxisAngle = FRONT_AXIS_ROTATION_ANGLE;
-//			secondPartMovement = Movement.FORWARD_LEFT;
-//		} else {
-//			throw new RuntimeException("Illegal curve type");
-//		}
-//
-//		currentCar = currentCar.withFrontAxisAngle(secondPartFrontAxisAngle);
-////		while(currentCar.getCenter().distanceTo(targetPosition) > acceptableError) {
-//		while(abs(currentCar.getOrientationAngle() - targetOrientation.angle()) > 0.05) {
-//			currentCar = currentCar.movedBy(ONE_STEP_DISTANCE);
-//			controls.add(secondPartMovement);
-//			iter++;
-//			if (iter > 2000) {
-//				return controls;
-//			}
-//		}
+		CarState finalState;
+
+		try {
+			finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetOrientation,
+					positionAcceptableError, directionAcceptableError);
+		} catch (IllegalStateException e) {
+			return new ArrayList<>();
+		}
+
+		List<Movement> subpathControls = new LinkedList<>();
+		CarState currentState = finalState;
+		subpathControls.add(0, currentState.getCausedMovement());
+		while (currentState.getPreviousCarState() != null) {
+			currentState = currentState.getPreviousCarState();
+			subpathControls.add(0, currentState.getCausedMovement());
+		}
+		controls.addAll(subpathControls);
 
 		return controls;
 	}
@@ -217,12 +130,23 @@ public final class PathResolver {
 	private CarState findNonHolonomicPath(Car car, Point targetPosition, Vector targetDirection,
 	                                      double positionAcceptableError, double directionAcceptableError) {
 		PriorityQueue<CarState> states = new PriorityQueue<>();
-		CarState currentState = new CarState(car, null, null, computeHeuristic(car, null, null));
+		PositionWithDirection localTarget = new PositionWithDirection(targetPosition, targetDirection);
+		PositionWithDirection localStart = new PositionWithDirection(car.getBackAxleCenter(), car.getOrientationVector());
+		CarState currentState = new CarState(car, null, null, computeHeuristic(car, null, null, localTarget, localStart));
 		List<Point> discardedStates = new ArrayList<>();
 		int iterations = 0;
 		int skippedIterations = 0;
-		while (computeDistanceToTarget(currentState.getCar()) > positionAcceptableError
-				||(abs(orientationError(currentState.getCar())) > directionAcceptableError)) {
+
+
+//		while (computeDistanceToTarget(currentState.getCar()) > positionAcceptableError
+//				||(abs(orientationError(currentState.getCar())) > directionAcceptableError)) {
+
+
+		while (currentState.getCar().getBackAxleCenter().distanceTo(targetPosition) > positionAcceptableError
+				||(abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)) > directionAcceptableError)) {
+
+//			System.out.println("distance to target: " + currentState.getCar().getBackAxleCenter().distanceTo(targetPosition));
+//			System.out.println("angle error: " + abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)));
 //			if (iterations > 10_000) {
 //				System.out.println("bangura");
 //			}
@@ -242,6 +166,10 @@ public final class PathResolver {
 					iterations++;
 					skippedIterations++;
 					currentState = states.peek();
+
+					System.out.println("distance to target: " + currentState.getCar().getBackAxleCenter().distanceTo(targetPosition));
+					System.out.println("angle error: " + abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)));
+					System.out.println("before continue");
 					continue;
 				}
 			}
@@ -252,43 +180,45 @@ public final class PathResolver {
 			if (!weights.containsKey(intPoint)) {
 				weights.put(intPoint, new CellWeight(WEIGHTED_DIRECTIONS_PER_CELL));
 			}
-			weights.get(intPoint).addWeight(car.getOrientationAngle());
+			weights.get(intPoint).addWeight(currentState.getCar().getOrientationAngle());
 
 			discardedStates.add(currentStateCenter);
 			states.remove(currentState);
 
+
+
 			try {
-				states.add(moveForward(currentState));
+				states.add(moveForward(currentState, localTarget, localStart));
 			} catch (ImpossibleMovementException e) {
 				// do nothing
 			}
 
 			try {
-				states.add(moveForwardLeft(currentState));
+				states.add(moveForwardLeft(currentState, localTarget, localStart));
 			} catch (ImpossibleMovementException e) {
 				// do nothing
 			}
 
 			try {
-				states.add(moveForwardRight(currentState));
+				states.add(moveForwardRight(currentState, localTarget, localStart));
 			} catch (ImpossibleMovementException e) {
 				// do nothing
 			}
 
 			try {
-				states.add(moveBackward(currentState));
+				states.add(moveBackward(currentState, localTarget, localStart));
 			} catch (ImpossibleMovementException e) {
 				// do nothing
 			}
 
 			try {
-				states.add(moveBackwardLeft(currentState));
+				states.add(moveBackwardLeft(currentState, localTarget, localStart));
 			} catch (ImpossibleMovementException e) {
 				// do nothing
 			}
 
 			try {
-				states.add(moveBackwardRight(currentState));
+				states.add(moveBackwardRight(currentState, localTarget, localStart));
 			} catch (ImpossibleMovementException e) {
 				// do nothing
 			}
@@ -309,12 +239,22 @@ public final class PathResolver {
 			discardedStates.clear();
 //			}
 
-			if (iterations > 10_000_000) {
-				throw new RuntimeException("Too many iterations");
+//			if (iterations > 10_000_000) {
+//				throw new RuntimeException("Too many iterations");
+//			}
+
+			if (iterations > 100_000) {
+				throw new IllegalStateException("Too many iterations");
 			}
 
-		}
 
+			System.out.println("distance to target: " + currentState.getCar().getBackAxleCenter().distanceTo(targetPosition));
+			System.out.println("angle error: " + abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)));
+			System.out.println("target: " + targetPosition);
+			System.out.println("car: " + currentState.getCar());
+
+		}
+		System.out.println("Finish!");
 		return currentState;
 	}
 //
@@ -326,11 +266,17 @@ public final class PathResolver {
 //		return abs(deltaAngle) < precision;
 //	}
 
-	private double orientationError(Car car) {
-		double carAngle = car.getOrientationAngle();
-		double targetAngle = targetOrientation.angle();
+//	private double orientationError(Car car) {
+//		double carAngle = car.getOrientationAngle();
+//		double targetAngle = targetOrientation.angle();
+//
+//		return atan2(sin(carAngle - targetAngle), cos(carAngle - targetAngle));
+//	}
 
-		return atan2(sin(carAngle - targetAngle), cos(carAngle - targetAngle));
+	private double angleBetween(Vector first, Vector second) {
+		double firstAngle = first.angle();
+		double secondAngle = second.angle();
+		return atan2(sin(firstAngle - secondAngle), cos(firstAngle - secondAngle));
 	}
 
 
@@ -343,7 +289,7 @@ public final class PathResolver {
 		int finishYIndex = (int) floor(targetPosition.getY() / obstacleSize);
 		IntegerPoint finish = new IntegerPoint(finishXIndex, finishYIndex);
 
-		int minPassageWidth = (int)ceil(car.getBodyWidth() / obstacleSize);
+		int minPassageWidth = ((int)ceil((car.getBodyWidth() / obstacleSize)));
 		ThetaStar thetaStar = new ThetaStar(field, start, finish, minPassageWidth);
 
 		List<IntegerPoint> pathInteger = thetaStar.findPath();
@@ -372,37 +318,38 @@ public final class PathResolver {
 		return new IntegerPoint(shiftedX, shiftedY);
 	}
 
-	private CarState moveForward(CarState carState) throws ImpossibleMovementException {
+	private CarState moveForward(CarState carState, PositionWithDirection localTarget, PositionWithDirection localStart) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(0.0).movedBy(ONE_STEP_DISTANCE);
-		return createCarStateIfPossible(movedCar, Movement.FORWARD, carState);
+		return createCarStateIfPossible(movedCar, Movement.FORWARD, carState, localTarget, localStart);
 	}
 
-	private CarState moveForwardLeft(CarState carState) throws ImpossibleMovementException {
+	private CarState moveForwardLeft(CarState carState, PositionWithDirection localTarget, PositionWithDirection localStart) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
-		return createCarStateIfPossible(movedCar, Movement.FORWARD_LEFT, carState);
+		return createCarStateIfPossible(movedCar, Movement.FORWARD_LEFT, carState, localTarget, localStart);
 	}
 
-	private CarState moveForwardRight(CarState carState) throws ImpossibleMovementException {
+	private CarState moveForwardRight(CarState carState, PositionWithDirection localTarget, PositionWithDirection localStart) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
-		return createCarStateIfPossible(movedCar, Movement.FORWARD_RIGHT, carState);
+		return createCarStateIfPossible(movedCar, Movement.FORWARD_RIGHT, carState, localTarget, localStart);
 	}
 
-	private CarState moveBackward(CarState carState) throws ImpossibleMovementException {
+	private CarState moveBackward(CarState carState, PositionWithDirection localTarget, PositionWithDirection localStart) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(0.0).movedBy(-ONE_STEP_DISTANCE);
-		return createCarStateIfPossible(movedCar, Movement.BACKWARD, carState);
+		return createCarStateIfPossible(movedCar, Movement.BACKWARD, carState, localTarget, localStart);
 	}
 
-	private CarState moveBackwardLeft(CarState carState) throws ImpossibleMovementException {
+	private CarState moveBackwardLeft(CarState carState, PositionWithDirection localTarget, PositionWithDirection localStart) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
-		return createCarStateIfPossible(movedCar, Movement.BACKWARD_LEFT, carState);
+		return createCarStateIfPossible(movedCar, Movement.BACKWARD_LEFT, carState, localTarget, localStart);
 	}
 
-	private CarState moveBackwardRight(CarState carState) throws ImpossibleMovementException {
+	private CarState moveBackwardRight(CarState carState, PositionWithDirection localTarget, PositionWithDirection localStart) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
-		return createCarStateIfPossible(movedCar, Movement.BACKWARD_RIGHT, carState);
+		return createCarStateIfPossible(movedCar, Movement.BACKWARD_RIGHT, carState, localTarget, localStart);
 	}
 
-	private CarState createCarStateIfPossible(Car movedCar, Movement movement, CarState previousState)
+	private CarState createCarStateIfPossible(Car movedCar, Movement movement, CarState previousState,
+	                                          PositionWithDirection localTarget, PositionWithDirection localStart)
 			throws ImpossibleMovementException {
 		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
@@ -411,12 +358,13 @@ public final class PathResolver {
 				movedCar,
 				movement,
 				previousState,
-				computeHeuristic(movedCar, movement, previousState)
+				computeHeuristic(movedCar, movement, previousState, localTarget, localStart)
 		);
 	}
 
-	private HeuristicDetails computeHeuristic(Car car, Movement movement, CarState prevState) {
-		double distanceToTarget = computeDistanceToTarget(car);
+	private HeuristicDetails computeHeuristic(Car car, Movement movement, CarState prevState,
+	                                          PositionWithDirection target, PositionWithDirection start) {
+		double distanceToTarget = car.getBackAxleCenter().distanceTo(target.getPosition());
 
 		if (prevState == null) {
 			checkArgument(movement == null);
@@ -434,31 +382,42 @@ public final class PathResolver {
 
 
 
-		double finalOrientationError = abs(orientationError(car));
-		double orientationErrorCoef = 50;
-		double orientationErrorWeight = orientationErrorCoef / (distanceToTarget * distanceToTarget);
+		double finalOrientationError = abs(angleBetween(
+				car.getOrientationVector(),
+				new Vector(car.getBackAxleCenter(), target.getPosition())));
+		double orientationErrorCoef = 2.0;
+		double orientationErrorWeight = orientationErrorCoef * distanceToTarget;
 //		double orientationErrorWeight = orientationErrorCoef;
 		double orientationErrorTerm = finalOrientationError * orientationErrorWeight;
 //		double orientationErrorTerm = 0;
+
+
+		double straightLineError = abs(distanceFromPointToLine(car.getBackAxleCenter(), start.getPosition(), target.getPosition()));
+		double moveOnStraightLineTerm = 0.1 * straightLineError * distanceToTarget;
+
+
 
 		double accumulatedWeight = prevState.getHeuristicDetails().getAccumulatedWeight();
 
 
 		if (movement.isBackward()) {
-			accumulatedWeight += 25;
+			accumulatedWeight += ONE_STEP_DISTANCE * 0.75;
+		} else if (movement == Movement.FORWARD_LEFT || movement == Movement.FORWARD_RIGHT) {
+			accumulatedWeight += ONE_STEP_DISTANCE * 0.3;
 		}
 
 
 		if (prevState.getCausedMovement() != null) {
 			if (movement != prevState.getCausedMovement()) {
-				accumulatedWeight +=100;
+				accumulatedWeight += ONE_STEP_DISTANCE * 10.0;
 			}
 		}
 
 
-		double prevDistance = prevState.getHeuristicDetails().getPreviousDistance();
+		double prevDistance = prevState.getHeuristicDetails().getPreviousDistance() + ONE_STEP_DISTANCE;
 
-		double heuristic = prevDistance + distanceToTarget + accumulatedWeight + cellWeight;
+//		double heuristic = prevDistance + distanceToTarget + accumulatedWeight + cellWeight;
+		double heuristic = distanceToTarget + cellWeight * 1.5 + accumulatedWeight + prevDistance + moveOnStraightLineTerm + orientationErrorTerm;
 
 		HeuristicDetails details =
 				new HeuristicDetails(prevDistance, distanceToTarget, accumulatedWeight, heuristic);
@@ -488,14 +447,12 @@ public final class PathResolver {
 		}
 		return positionWeight;
 	}
-
-	private double computeDistanceToTarget(Car car) {
-		return car.getBackAxleCenter().distanceTo(targetPosition);
-	}
+//
+//	private double computeDistanceToTarget(Car car, Point targetPosition) {
+//		return car.getBackAxleCenter().distanceTo(targetPosition);
+//	}
 
 	private static final class CarState implements Comparable<CarState> {
-		private static final double WEIGHT_FOR_CHANGING_CONTROL = 100;
-
 		private final Car car;
 		private final CarState previousCarState;
 		private final Movement causedMovement;
