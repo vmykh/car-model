@@ -44,120 +44,55 @@ public final class PathResolver {
 	public List<Movement> resolvePath(Car car) {
 		// experimental theta *
 
-//		List<Point> thetaStarPath = computeThetaStarPath(car);
-//		listener.thetaStarPoints(thetaStarPath);
+		List<Point> thetaStarPath = computeThetaStarPath(car);
+		listener.thetaStarPoints(thetaStarPath);
 
+//		if (true) {
+//			return new ArrayList<>();
+//		}
+//
 //		try {
 //			Thread.sleep(Long.MAX_VALUE);
 //		} catch (InterruptedException e) {
 //			throw new RuntimeException(e);
 //		}
 
-		PriorityQueue<CarState> states = new PriorityQueue<>();
-		CarState currentState = new CarState(car, null, null, computeHeuristic(car, null, null));
-		List<Point> discardedStates = new ArrayList<>();
-		int iterations = 0;
-		int skippedIterations = 0;
-		while (computeDistanceToTarget(currentState.getCar()) > ACCEPTABLE_FINISH_POSITION_ERROR
-				||(abs(orientationError(currentState.getCar())) > PI / 16)) {
-//			if (iterations > 10_000) {
-//				System.out.println("bangura");
-//			}
+		Car currentStartCar = car;
 
-
-			if (currentState.previousCarState != null) {
-				double currentStateHeuristic = currentState.getHeuristicDetails().getHeuristic();
-				HeuristicDetails actualHeuristicDetails = recomputeHeuristic(currentState);
-				double actualHeuristic = actualHeuristicDetails.getHeuristic();
-				if (abs(currentStateHeuristic - actualHeuristic) > ACCEPTABLE_HEURISTIC_DIFFERENCE) {
-					states.remove(currentState);
-					states.add(
-							new CarState(currentState.getCar(), currentState.causedMovement,
-									currentState.getPreviousCarState(), actualHeuristicDetails)
-					);
-
-					iterations++;
-					skippedIterations++;
-					currentState = states.peek();
-					continue;
-				}
-			}
-
-			Point currentStateCenter = currentState.getCar().getCenter();
-
-			IntegerPoint intPoint = roundPoint(currentStateCenter);
-			if (!weights.containsKey(intPoint)) {
-				weights.put(intPoint, new CellWeight(WEIGHTED_DIRECTIONS_PER_CELL));
-			}
-			weights.get(intPoint).addWeight(car.getOrientationAngle());
-
-			discardedStates.add(currentStateCenter);
-			states.remove(currentState);
-
-			try {
-				states.add(moveForward(currentState));
-			} catch (ImpossibleMovementException e) {
-				// do nothing
-			}
-
-			try {
-				states.add(moveForwardLeft(currentState));
-			} catch (ImpossibleMovementException e) {
-				// do nothing
-			}
-
-			try {
-				states.add(moveForwardRight(currentState));
-			} catch (ImpossibleMovementException e) {
-				// do nothing
-			}
-
-			try {
-				states.add(moveBackward(currentState));
-			} catch (ImpossibleMovementException e) {
-				// do nothing
-			}
-
-			try {
-				states.add(moveBackwardLeft(currentState));
-			} catch (ImpossibleMovementException e) {
-				// do nothing
-			}
-
-			try {
-				states.add(moveBackwardRight(currentState));
-			} catch (ImpossibleMovementException e) {
-				// do nothing
-			}
-
-			if (states.size() == 0) {
-				throw new RuntimeException("Cannot resolve path");
-			}
-
-			currentState = states.peek();
-
-			iterations++;
-//			if (iterations % 1000 == 0) {
-				System.out.println("iter " + iterations + "   distance: " + currentState.getHeuristicDetails().getHeuristic());
-				System.out.println("skipped " + skippedIterations);
-				System.out.println("nodes " + (iterations - skippedIterations));
-//				listener.intermediatePoints(new ArrayList<>(discardedStates));
-				listener.intermediatePoints(asList(currentStateCenter));
-				discardedStates.clear();
-//			}
-
-				if (iterations > 10_000_000) {
-				throw new RuntimeException("Too many iterations");
-			}
-
-		}
-
-		// go reverse
 		List<Movement> controls = new LinkedList<>();
-		controls.add(0, currentState.getCausedMovement());
-		while (currentState.getPreviousCarState() != null) {
-			currentState = currentState.getPreviousCarState();
+
+		for (int i = 1; i < thetaStarPath.size() - 1; i++) {
+			Point previous = thetaStarPath.get(i - 1);
+			Point current =  thetaStarPath.get(i);
+			Point next =  thetaStarPath.get(i + 1);
+			Point targetPosition = current;
+			Vector targetDirection = new Vector(previous, targetPosition).add(new Vector(targetPosition, next));
+
+			double positionAcceptableError = 30;
+			double directionAcceptableError = 30;
+			CarState finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetDirection,
+					positionAcceptableError, directionAcceptableError);
+			currentStartCar = finalState.getCar();
+
+
+			CarState currentState = finalState;
 			controls.add(0, currentState.getCausedMovement());
+			while (currentState.getPreviousCarState() != null) {
+				currentState = currentState.getPreviousCarState();
+				controls.add(0, currentState.getCausedMovement());
+			}
+
+//			Point currentTarget
+
+
+
+			// go reverse
+//			List<Movement> controls = new LinkedList<>();
+//			controls.add(0, currentState.getCausedMovement());
+//			while (currentState.getPreviousCarState() != null) {
+//				currentState = currentState.getPreviousCarState();
+//				controls.add(0, currentState.getCausedMovement());
+//			}
 		}
 
 
@@ -277,6 +212,110 @@ public final class PathResolver {
 //		}
 
 		return controls;
+	}
+
+	private CarState findNonHolonomicPath(Car car, Point targetPosition, Vector targetDirection,
+	                                      double positionAcceptableError, double directionAcceptableError) {
+		PriorityQueue<CarState> states = new PriorityQueue<>();
+		CarState currentState = new CarState(car, null, null, computeHeuristic(car, null, null));
+		List<Point> discardedStates = new ArrayList<>();
+		int iterations = 0;
+		int skippedIterations = 0;
+		while (computeDistanceToTarget(currentState.getCar()) > positionAcceptableError
+				||(abs(orientationError(currentState.getCar())) > directionAcceptableError)) {
+//			if (iterations > 10_000) {
+//				System.out.println("bangura");
+//			}
+
+
+			if (currentState.previousCarState != null) {
+				double currentStateHeuristic = currentState.getHeuristicDetails().getHeuristic();
+				HeuristicDetails actualHeuristicDetails = recomputeHeuristic(currentState);
+				double actualHeuristic = actualHeuristicDetails.getHeuristic();
+				if (abs(currentStateHeuristic - actualHeuristic) > ACCEPTABLE_HEURISTIC_DIFFERENCE) {
+					states.remove(currentState);
+					states.add(
+							new CarState(currentState.getCar(), currentState.causedMovement,
+									currentState.getPreviousCarState(), actualHeuristicDetails)
+					);
+
+					iterations++;
+					skippedIterations++;
+					currentState = states.peek();
+					continue;
+				}
+			}
+
+			Point currentStateCenter = currentState.getCar().getCenter();
+
+			IntegerPoint intPoint = roundPoint(currentStateCenter);
+			if (!weights.containsKey(intPoint)) {
+				weights.put(intPoint, new CellWeight(WEIGHTED_DIRECTIONS_PER_CELL));
+			}
+			weights.get(intPoint).addWeight(car.getOrientationAngle());
+
+			discardedStates.add(currentStateCenter);
+			states.remove(currentState);
+
+			try {
+				states.add(moveForward(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			try {
+				states.add(moveForwardLeft(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			try {
+				states.add(moveForwardRight(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			try {
+				states.add(moveBackward(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			try {
+				states.add(moveBackwardLeft(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			try {
+				states.add(moveBackwardRight(currentState));
+			} catch (ImpossibleMovementException e) {
+				// do nothing
+			}
+
+			if (states.size() == 0) {
+				throw new RuntimeException("Cannot resolve path");
+			}
+
+			currentState = states.peek();
+
+			iterations++;
+//			if (iterations % 1000 == 0) {
+			System.out.println("iter " + iterations + "   distance: " + currentState.getHeuristicDetails().getHeuristic());
+			System.out.println("skipped " + skippedIterations);
+			System.out.println("nodes " + (iterations - skippedIterations));
+//				listener.intermediatePoints(new ArrayList<>(discardedStates));
+			listener.intermediatePoints(asList(currentStateCenter));
+			discardedStates.clear();
+//			}
+
+			if (iterations > 10_000_000) {
+				throw new RuntimeException("Too many iterations");
+			}
+
+		}
+
+		return currentState;
 	}
 //
 //	private boolean carOrientationIsProper(Car car, double precision) {
