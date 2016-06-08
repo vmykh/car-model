@@ -5,8 +5,8 @@ import java.util.Arrays;
 import static java.lang.Math.PI;
 
 public final class CellWeight {
-	public static final int COMMON_WEIGHT_COEF = 3;
-	public static final int DIRECTION_WEIGHT_COEF = 20;
+	public static final int COMMON_WEIGHT_COEF = 2;
+	public static final int DIRECTION_WEIGHT_COEF = 250;
 	private static final double TWO_PI = 2 * Math.PI;
 
 	private final int directions;

@@ -39,10 +39,7 @@ public class Main extends Application {
 
 	private GraphicsContext gc;
 	private Canvas canvas;
-	private volatile Car car =
-			new Car(BODY_WIDTH, BODY_LENGTH, CHASSIS_WIDTH, CHASSIS_LENGTH)
-			.setInitialPosition(250, 250)
-			.setInitialOrientation(PI / 2);
+	private volatile Car car;
 
 	private List<Point> tracePoints = new ArrayList<>();
 
@@ -89,6 +86,10 @@ public class Main extends Application {
 
 		canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
 		gc = canvas.getGraphicsContext2D();
+
+
+		car = createInitialCar();
+		createInitialTarget();
 
 		drawCar(car);
 
@@ -231,6 +232,16 @@ public class Main extends Application {
 			}
 		});
 
+	}
+
+	private Car createInitialCar() {
+		return new Car(BODY_WIDTH, BODY_LENGTH, CHASSIS_WIDTH, CHASSIS_LENGTH)
+				.setInitialPosition(350, 550)
+				.setInitialOrientation(PI / 2);
+	}
+
+	private void createInitialTarget() {
+		createTarget(car, new Point(350, 150), Vector.fromAngle(-PI/2));
 	}
 
 	private static Car createCar(Point backCenterPoint, Vector direction) {
@@ -380,7 +391,11 @@ public class Main extends Application {
 							if (drawedSubpathes < intermediatePath.size()) {
 								List<Point> subpath = intermediatePath.get(drawedSubpathes++);
 								for (Point point : subpath) {
-									drawCircle(point, 3, Color.DARKGREEN);
+									if (drawedSubpathes % 2 == 1) {
+										drawCircle(point, 5, Color.DARKGREEN);
+									} else {
+										fillRect(point.getX(), point.getY(), 7, 7, Color.PURPLE);
+									}
 								}
 							}
 						} else {

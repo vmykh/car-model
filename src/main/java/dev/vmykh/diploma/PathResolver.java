@@ -2,13 +2,15 @@ package dev.vmykh.diploma;
 
 import java.util.*;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static dev.vmykh.diploma.DubinsCurveType.*;
 import static java.lang.Math.*;
+import static java.util.Arrays.asList;
 
 public final class PathResolver {
-	public static final double ONE_STEP_DISTANCE = 5.0;
+	public static final double ONE_STEP_DISTANCE = 50.0;
 	public static final double FRONT_AXIS_ROTATION_ANGLE = PI / 8.0;
-	public static final double ACCEPTABLE_FINISH_POSITION_ERROR = 10.0;
+	public static final double ACCEPTABLE_FINISH_POSITION_ERROR = 30.0;
 	private static final int WEIGHTED_DIRECTIONS_PER_CELL = 32;
 
 	public static final double ACCEPTABLE_HEURISTIC_DIFFERENCE = 50.0;
@@ -17,7 +19,7 @@ public final class PathResolver {
 	private final Vector targetOrientation;
 	private final CollisionDetectorDiscreteField collisionDetectorDiscreteField;
 
-	private static final int WEIGHT_CELL_SIZE = 3;
+	private static final int WEIGHT_CELL_SIZE = 50;
 	private final Map<IntegerPoint, CellWeight> weights = new HashMap<>();
 
 	private final PathResolverListener listener;
@@ -52,25 +54,26 @@ public final class PathResolver {
 //		}
 
 		PriorityQueue<CarState> states = new PriorityQueue<>();
-		CarState currentState = new CarState(car, null, null, car.getBackAxleCenter().distanceTo(targetPosition), 0);
+		CarState currentState = new CarState(car, null, null, computeHeuristic(car, null, null));
 		List<Point> discardedStates = new ArrayList<>();
 		int iterations = 0;
 		int skippedIterations = 0;
 		while (computeDistanceToTarget(currentState.getCar()) > ACCEPTABLE_FINISH_POSITION_ERROR
-				||(abs(orientationError(currentState.getCar())) > PI / 8)) {
+				||(abs(orientationError(currentState.getCar())) > PI / 16)) {
 //			if (iterations > 10_000) {
 //				System.out.println("bangura");
 //			}
 
 
 			if (currentState.previousCarState != null) {
-				double currentStateHeuristic = currentState.getHeuristic();
-				double actualHeuristic = computeHeuristic(currentState);
+				double currentStateHeuristic = currentState.getHeuristicDetails().getHeuristic();
+				HeuristicDetails actualHeuristicDetails = recomputeHeuristic(currentState);
+				double actualHeuristic = actualHeuristicDetails.getHeuristic();
 				if (abs(currentStateHeuristic - actualHeuristic) > ACCEPTABLE_HEURISTIC_DIFFERENCE) {
 					states.remove(currentState);
 					states.add(
-							new CarState(currentState.getCar(), currentState.causedMovement, currentState.getPreviousCarState(),
-									actualHeuristic, currentState.getPreviousDistance())
+							new CarState(currentState.getCar(), currentState.causedMovement,
+									currentState.getPreviousCarState(), actualHeuristicDetails)
 					);
 
 					iterations++;
@@ -134,13 +137,16 @@ public final class PathResolver {
 			currentState = states.peek();
 
 			iterations++;
-			if (iterations % 1000 == 0) {
-				System.out.println("iter " + iterations + "   distance: " + currentState.getHeuristic());
-				listener.intermediatePoints(new ArrayList<>(discardedStates));
+//			if (iterations % 1000 == 0) {
+				System.out.println("iter " + iterations + "   distance: " + currentState.getHeuristicDetails().getHeuristic());
+				System.out.println("skipped " + skippedIterations);
+				System.out.println("nodes " + (iterations - skippedIterations));
+//				listener.intermediatePoints(new ArrayList<>(discardedStates));
+				listener.intermediatePoints(asList(currentStateCenter));
 				discardedStates.clear();
-			}
+//			}
 
-			if (iterations > 10_000_000) {
+				if (iterations > 10_000_000) {
 				throw new RuntimeException("Too many iterations");
 			}
 
@@ -329,115 +335,119 @@ public final class PathResolver {
 
 	private CarState moveForward(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(0.0).movedBy(ONE_STEP_DISTANCE);
-		double previousDistance = carState.getPreviousDistance() + ONE_STEP_DISTANCE;
-		if (collisionDetectorDiscreteField.collides(movedCar)) {
-			throw new ImpossibleMovementException();
-		}
-		return new CarState(
-				movedCar,
-				Movement.FORWARD,
-				carState,
-				computeHeuristic(carState),
-				previousDistance
-				);
+		return createCarStateIfPossible(movedCar, Movement.FORWARD, carState);
 	}
 
 	private CarState moveForwardLeft(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
-		double previousDistance = carState.getPreviousDistance() + ONE_STEP_DISTANCE;
-		if (collisionDetectorDiscreteField.collides(movedCar)) {
-			throw new ImpossibleMovementException();
-		}
-		return new CarState(
-				movedCar,
-				Movement.FORWARD_LEFT,
-				carState,
-				computeHeuristic(carState),
-				previousDistance
-		);
+		return createCarStateIfPossible(movedCar, Movement.FORWARD_LEFT, carState);
 	}
 
 	private CarState moveForwardRight(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
-		double previousDistance = carState.getPreviousDistance() + ONE_STEP_DISTANCE;
-		if (collisionDetectorDiscreteField.collides(movedCar)) {
-			throw new ImpossibleMovementException();
-		}
-		return new CarState(
-				movedCar,
-				Movement.FORWARD_RIGHT,
-				carState,
-				computeHeuristic(carState),
-				previousDistance
-		);
+		return createCarStateIfPossible(movedCar, Movement.FORWARD_RIGHT, carState);
 	}
 
 	private CarState moveBackward(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(0.0).movedBy(-ONE_STEP_DISTANCE);
-		double previousDistance = carState.getPreviousDistance() + ONE_STEP_DISTANCE;
-		if (collisionDetectorDiscreteField.collides(movedCar)) {
-			throw new ImpossibleMovementException();
-		}
-		return new CarState(
-				movedCar,
-				Movement.BACKWARD,
-				carState,
-				computeHeuristic(carState),
-				previousDistance
-		);
+		return createCarStateIfPossible(movedCar, Movement.BACKWARD, carState);
 	}
 
 	private CarState moveBackwardLeft(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
-		double previousDistance = carState.getPreviousDistance() + ONE_STEP_DISTANCE;
-		if (collisionDetectorDiscreteField.collides(movedCar)) {
-			throw new ImpossibleMovementException();
-		}
-		return new CarState(
-				movedCar,
-				Movement.BACKWARD_LEFT,
-				carState,
-				computeHeuristic(carState),
-				previousDistance
-		);
+		return createCarStateIfPossible(movedCar, Movement.BACKWARD_LEFT, carState);
 	}
 
 	private CarState moveBackwardRight(CarState carState) throws ImpossibleMovementException {
 		Car movedCar = carState.car.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
-		double previousDistance = carState.getPreviousDistance() + ONE_STEP_DISTANCE;
+		return createCarStateIfPossible(movedCar, Movement.BACKWARD_RIGHT, carState);
+	}
+
+	private CarState createCarStateIfPossible(Car movedCar, Movement movement, CarState previousState)
+			throws ImpossibleMovementException {
 		if (collisionDetectorDiscreteField.collides(movedCar)) {
 			throw new ImpossibleMovementException();
 		}
 		return new CarState(
 				movedCar,
-				Movement.BACKWARD_RIGHT,
-				carState,
-				computeHeuristic(carState),
-				previousDistance
+				movement,
+				previousState,
+				computeHeuristic(movedCar, movement, previousState)
 		);
 	}
 
-	private double computeHeuristic(CarState carState) {
-		Car car = carState.getCar();
-		double positionWeight = 0.0;
-		CellWeight cellWeight = weights.get(roundPoint(car.getCenter()));
-		if (cellWeight != null) {
-			positionWeight = cellWeight.getWeight(car.getOrientationAngle());
+	private HeuristicDetails computeHeuristic(Car car, Movement movement, CarState prevState) {
+		double distanceToTarget = computeDistanceToTarget(car);
+
+		if (prevState == null) {
+			checkArgument(movement == null);
+
+			return new HeuristicDetails(0.0, distanceToTarget, 0.0, distanceToTarget);
 		}
 
-		Vector fromCarToTarget = new Vector(car.getCenter(), targetPosition);
-		double orientationWeight = abs(car.getOrientationAngle() - fromCarToTarget.angle()) * 20;
+//		Car car = prevState.getCar();
+		double cellWeight = computeCellWeight(car);
+
+//		Vector fromCarToTarget = new Vector(car.getCenter(), targetPosition);
+//		double orientationWeight = abs(car.getOrientationAngle() - fromCarToTarget.angle()) * 20;
 
 //		return computeDistanceToTarget(car) + positionWeight + orientationWeight;
 
-		double distanceToTarget = computeDistanceToTarget(car);
+
 
 		double finalOrientationError = abs(orientationError(car));
-		double orientationErrorCoef = 5;
-		double orientationErrorWeight = orientationErrorCoef / distanceToTarget;
+		double orientationErrorCoef = 50;
+		double orientationErrorWeight = orientationErrorCoef / (distanceToTarget * distanceToTarget);
+//		double orientationErrorWeight = orientationErrorCoef;
 		double orientationErrorTerm = finalOrientationError * orientationErrorWeight;
+//		double orientationErrorTerm = 0;
 
-		return distanceToTarget + carState.getPreviousDistance() + positionWeight + orientationErrorTerm;
+		double accumulatedWeight = prevState.getHeuristicDetails().getAccumulatedWeight();
+
+
+		if (movement.isBackward()) {
+			accumulatedWeight += 25;
+		}
+
+
+		if (prevState.getCausedMovement() != null) {
+			if (movement != prevState.getCausedMovement()) {
+				accumulatedWeight +=100;
+			}
+		}
+
+
+		double prevDistance = prevState.getHeuristicDetails().getPreviousDistance();
+
+		double heuristic = prevDistance + distanceToTarget + accumulatedWeight + cellWeight;
+
+		HeuristicDetails details =
+				new HeuristicDetails(prevDistance, distanceToTarget, accumulatedWeight, heuristic);
+//		return distanceToTarget + carState.getPreviousDistance() + positionWeight + orientationErrorTerm;
+//		return distanceToTarget + carState.getPreviousDistance() + positionWeight + carState.getAccumulatedWeight();
+//		return distanceToTarget + carState.getPreviousDistance() + carState.getAccumulatedWeight() + orientationErrorCoef;
+		return details;
+//		return carState.getPreviousDistance() + abs(finalOrientationError * 10);
+//		return distanceToTarget;
+	}
+
+	private HeuristicDetails recomputeHeuristic(CarState state) {
+		HeuristicDetails prevDetails = state.getHeuristicDetails();
+		return new HeuristicDetails(
+				prevDetails.getPreviousDistance(),
+				prevDetails.getDistanceToTarget(),
+				prevDetails.getAccumulatedWeight(),
+				computeCellWeight(state.getCar())
+		);
+	}
+
+	private double computeCellWeight(Car car) {
+		double positionWeight = 0.0;
+		CellWeight cellWeight = weights.get(roundPoint(car.getBackAxleCenter()));
+		if (cellWeight != null) {
+			positionWeight = cellWeight.getWeight(car.getOrientationAngle());
+		}
+		return positionWeight;
 	}
 
 	private double computeDistanceToTarget(Car car) {
@@ -445,21 +455,21 @@ public final class PathResolver {
 	}
 
 	private static final class CarState implements Comparable<CarState> {
+		private static final double WEIGHT_FOR_CHANGING_CONTROL = 100;
+
 		private final Car car;
-		private final Movement causedMovement;
-		private final double heuristic;
-		private final double previousDistance;
 		private final CarState previousCarState;
+		private final Movement causedMovement;
+		private final HeuristicDetails heuristicDetails;
 
 
 
 		public CarState(Car car, Movement causedMovement, CarState previousCarState,
-		                double heuristic, double previousDistance) {
+		                HeuristicDetails heuristicDetails) {
 			this.car = car;
 			this.causedMovement = causedMovement;
 			this.previousCarState = previousCarState;
-			this.heuristic = heuristic;
-			this.previousDistance = previousDistance;
+			this.heuristicDetails = heuristicDetails;
 		}
 
 		public Car getCar() {
@@ -470,21 +480,64 @@ public final class PathResolver {
 			return causedMovement;
 		}
 
-		public double getHeuristic() {
-			return heuristic;
-		}
-
 		public CarState getPreviousCarState() {
 			return previousCarState;
+		}
+
+		public HeuristicDetails getHeuristicDetails() {
+			return heuristicDetails;
+		}
+
+		@Override
+		public int compareTo(CarState another) {
+			return Double.compare(this.heuristicDetails.getHeuristic(), another.heuristicDetails.getHeuristic());
+		}
+
+		@Override
+		public String toString() {
+			return "CarState{" +
+					"x = " + car.getX() + ", y = " + car.getY() +
+					", h = " + heuristicDetails;
+		}
+	}
+
+	private static final class HeuristicDetails {
+		private final double previousDistance;
+		private final double distanceToTarget;
+		private final double accumulatedWeight;
+		private final double heuristic;
+
+		public HeuristicDetails(double previousDistance, double distanceToTarget, double accumulatedWeight, double heuristic) {
+			this.previousDistance = previousDistance;
+			this.distanceToTarget = distanceToTarget;
+			this.accumulatedWeight = accumulatedWeight;
+			this.heuristic = heuristic;
 		}
 
 		public double getPreviousDistance() {
 			return previousDistance;
 		}
 
+		public double getDistanceToTarget() {
+			return distanceToTarget;
+		}
+
+		public double getAccumulatedWeight() {
+			return accumulatedWeight;
+		}
+
+		public double getHeuristic() {
+			return heuristic;
+		}
+
 		@Override
-		public int compareTo(CarState another) {
-			return Double.compare(this.heuristic, another.heuristic);
+		public String toString() {
+			return "HeuristicDetails{" +
+					"previousDistance=" + previousDistance +
+					", distanceToTarget=" + distanceToTarget +
+					", accumulatedWeight=" + accumulatedWeight +
+					", heuristic=" + heuristic +
+					'}';
 		}
 	}
 
