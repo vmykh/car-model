@@ -47,88 +47,149 @@ public final class PathResolver {
 	}
 
 	public List<Movement> resolvePath(Car car) {
-		// experimental theta *
-
-		List<Point> thetaStarPath = computeThetaStarPath(car);
-		listener.thetaStarPoints(thetaStarPath);
-
-
 		ONE_STEP_DISTANCE = car.getChassisLength() * 1.25;
 		ACCEPTABLE_HEURISTIC_DIFFERENCE = ONE_STEP_DISTANCE;
 		WEIGHT_CELL_SIZE = (int)ONE_STEP_DISTANCE;
-
-//		if (true) {
-//			return new ArrayList<>();
-//		}
-//
-//		try {
-//			Thread.sleep(Long.MAX_VALUE);
-//		} catch (InterruptedException e) {
-//			throw new RuntimeException(e);
-//		}
 
 		Car currentStartCar = car;
 
 		List<Movement> controls = new LinkedList<>();
 
-		for (int i = 1; i < thetaStarPath.size() - 1; i++) {
-			Point previous = thetaStarPath.get(i - 1);
-			Point current = thetaStarPath.get(i);
-			Point next = thetaStarPath.get(i + 1);
-			Vector targetDirection = new Vector(previous, current).add(new Vector(current, next));
-			Point targetPosition = current.add(targetDirection.perpendicular().normalizedTo(ONE_STEP_DISTANCE));
+		List<Movement> currentAttemntControls = new LinkedList<>();
 
-			double positionAcceptableError = ONE_STEP_DISTANCE * 2;
-			double directionAcceptableError = PI / 10;
+		int attemptsToRestart = 0;
+		while(attemptsToRestart < 10) {
 
-			CarState finalState;
+			System.out.println("attemps to restart used: " + attemptsToRestart);
 
 			try {
-				finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetDirection,
-						positionAcceptableError, directionAcceptableError);
-			} catch (IllegalStateException e) {
-				return new ArrayList<>();
-			}
+				List<Point> thetaStarPath;
+				try {
+					thetaStarPath = computeThetaStarPath(currentStartCar);
+				} catch (Exception e) {
+					System.out.println("Cannot find path using theta star");
+					e.printStackTrace();
+					return new ArrayList<>();
+				}
+				listener.thetaStarPoints(thetaStarPath);
+
+				for (int i = 1; i < thetaStarPath.size() - 1; i++) {
+					Point previous = thetaStarPath.get(i - 1);
+					Point current = thetaStarPath.get(i);
+					Point next = thetaStarPath.get(i + 1);
+					Vector targetDirection = new Vector(previous, current).add(new Vector(current, next));
+					Point targetPosition = current.add(targetDirection.perpendicular().normalizedTo(ONE_STEP_DISTANCE));
+
+					double positionAcceptableError = ONE_STEP_DISTANCE * 2;
+					double directionAcceptableError = PI / 10;
+
+					CarState finalState;
+
+//					try {
+						finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetDirection,
+								positionAcceptableError, directionAcceptableError);
+//					} catch (IllegalStateException e) {
+//						return new ArrayList<>();
+//					}
+
+
 					;
-			currentStartCar = finalState.getCar();
+					currentStartCar = finalState.getCar();
 
-			List<Movement> subpathControls = new LinkedList<>();
-			CarState currentState = finalState;
-			subpathControls.add(0, currentState.getCausedMovement());
-			while (currentState.getPreviousCarState() != null) {
-				currentState = currentState.getPreviousCarState();
+					List<Movement> subpathControls = new LinkedList<>();
+					CarState currentState = finalState;
+					subpathControls.add(0, currentState.getCausedMovement());
+					while (currentState.getPreviousCarState() != null) {
+						currentState = currentState.getPreviousCarState();
+						subpathControls.add(0, currentState.getCausedMovement());
+					}
+					currentAttemntControls.addAll(subpathControls);
+
+				}
+
+				double positionAcceptableError = ONE_STEP_DISTANCE;
+				double directionAcceptableError = PI / 16;
+
+				CarState finalState;
+
+//				try {
+					finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetOrientation,
+							positionAcceptableError, directionAcceptableError);
+//				} catch (IllegalStateException e) {
+//					return new ArrayList<>();
+//				}
+
+				List<Movement> subpathControls = new LinkedList<>();
+				CarState currentState = finalState;
 				subpathControls.add(0, currentState.getCausedMovement());
+				while (currentState.getPreviousCarState() != null) {
+					currentState = currentState.getPreviousCarState();
+					subpathControls.add(0, currentState.getCausedMovement());
+				}
+				currentAttemntControls.addAll(subpathControls);
+
+				controls.addAll(currentAttemntControls);
+				return controls;
+			} catch (TooManyIterationException e) {
+				// make random movement
+//				Movement randomMovement = chooseRandomMovement(currentStartCar);
+
+				attemptsToRestart++;
+
+				currentAttemntControls.clear();
+
+				// TODO(vmykh): refactor this shit
+				while(true) {
+					Random random = new Random();
+					int randomNumber = random.nextInt();
+					if (randomNumber == Integer.MIN_VALUE) {
+						randomNumber = Integer.MAX_VALUE;
+					}
+
+					int movementNumber = abs(randomNumber) % 6;
+
+					Movement movement;
+					Car movedCar;
+					if (movementNumber == 0) {
+						movement = Movement.FORWARD;
+						movedCar = currentStartCar.movedBy(ONE_STEP_DISTANCE);
+					} else if (movementNumber == 1) {
+						movement = Movement.FORWARD_LEFT;
+						movedCar = currentStartCar.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
+					} else if (movementNumber == 2) {
+						movement = Movement.FORWARD_RIGHT;
+						movedCar = currentStartCar.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(ONE_STEP_DISTANCE);
+					} else if (movementNumber == 3) {
+						movement = Movement.BACKWARD;
+						movedCar = currentStartCar.movedBy(-ONE_STEP_DISTANCE);
+ 					} else if (movementNumber == 4) {
+						movement = Movement.BACKWARD_LEFT;
+						movedCar = currentStartCar.withFrontAxisAngle(FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
+					} else if (movementNumber == 5) {
+						movement = Movement.BACKWARD_RIGHT;
+						movedCar = currentStartCar.withFrontAxisAngle(-FRONT_AXIS_ROTATION_ANGLE).movedBy(-ONE_STEP_DISTANCE);
+					} else {
+						throw new RuntimeException();
+					}
+
+					if (!collisionDetectorDiscreteField.collides(movedCar)) {
+						controls.add(movement);
+						currentStartCar = movedCar;
+					}
+
+					break;
+				}
+
+
 			}
-			controls.addAll(subpathControls);
-
 		}
-
-		double positionAcceptableError = ONE_STEP_DISTANCE;
-		double directionAcceptableError = PI / 16;
-
-		CarState finalState;
-
-		try {
-			finalState = findNonHolonomicPath(currentStartCar, targetPosition, targetOrientation,
-					positionAcceptableError, directionAcceptableError);
-		} catch (IllegalStateException e) {
-			return new ArrayList<>();
-		}
-
-		List<Movement> subpathControls = new LinkedList<>();
-		CarState currentState = finalState;
-		subpathControls.add(0, currentState.getCausedMovement());
-		while (currentState.getPreviousCarState() != null) {
-			currentState = currentState.getPreviousCarState();
-			subpathControls.add(0, currentState.getCausedMovement());
-		}
-		controls.addAll(subpathControls);
-
-		return controls;
+		System.out.println("returning empty list");
+		return new ArrayList<>();
 	}
 
 	private CarState findNonHolonomicPath(Car car, Point targetPosition, Vector targetDirection,
-	                                      double positionAcceptableError, double directionAcceptableError) {
+	                                      double positionAcceptableError, double directionAcceptableError)
+			throws TooManyIterationException {
 		PriorityQueue<CarState> states = new PriorityQueue<>();
 		PositionWithDirection localTarget = new PositionWithDirection(targetPosition, targetDirection);
 		PositionWithDirection localStart = new PositionWithDirection(car.getBackAxleCenter(), car.getOrientationVector());
@@ -167,9 +228,9 @@ public final class PathResolver {
 					skippedIterations++;
 					currentState = states.peek();
 
-					System.out.println("distance to target: " + currentState.getCar().getBackAxleCenter().distanceTo(targetPosition));
-					System.out.println("angle error: " + abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)));
-					System.out.println("before continue");
+//					System.out.println("distance to target: " + currentState.getCar().getBackAxleCenter().distanceTo(targetPosition));
+//					System.out.println("angle error: " + abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)));
+//					System.out.println("before continue");
 					continue;
 				}
 			}
@@ -231,9 +292,9 @@ public final class PathResolver {
 
 			iterations++;
 //			if (iterations % 1000 == 0) {
-			System.out.println("iter " + iterations + "   distance: " + currentState.getHeuristicDetails().getHeuristic());
-			System.out.println("skipped " + skippedIterations);
-			System.out.println("nodes " + (iterations - skippedIterations));
+//			System.out.println("iter " + iterations + "   distance: " + currentState.getHeuristicDetails().getHeuristic());
+//			System.out.println("skipped " + skippedIterations);
+//			System.out.println("nodes " + (iterations - skippedIterations));
 //				listener.intermediatePoints(new ArrayList<>(discardedStates));
 			listener.intermediatePoints(asList(currentStateCenter));
 			discardedStates.clear();
@@ -243,15 +304,18 @@ public final class PathResolver {
 //				throw new RuntimeException("Too many iterations");
 //			}
 
-			if (iterations > 100_000) {
-				throw new IllegalStateException("Too many iterations");
+			if (iterations > 25_000) {
+				throw new TooManyIterationException("Too many iterations");
 			}
 
 
-			System.out.println("distance to target: " + currentState.getCar().getBackAxleCenter().distanceTo(targetPosition));
-			System.out.println("angle error: " + abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)));
-			System.out.println("target: " + targetPosition);
-			System.out.println("car: " + currentState.getCar());
+			if (iterations % 1000 == 0) {
+				System.out.println("iterations: " + iterations);
+//				System.out.println("distance to target: " + currentState.getCar().getBackAxleCenter().distanceTo(targetPosition));
+//				System.out.println("angle error: " + abs(angleBetween(currentState.getCar().getOrientationVector(), targetDirection)));
+//				System.out.println("target: " + targetPosition);
+//				System.out.println("car: " + currentState.getCar());
+			}
 
 		}
 		System.out.println("Finish!");
