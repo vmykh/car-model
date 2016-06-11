@@ -28,6 +28,10 @@ public final class Car {
 		this.chassisLength = chassisLength;
 	}
 
+	public static Car createWithSameWidthAndLength(Car source) {
+		return new Car(source.bodyWidth, source.bodyLength, source.chassisWidth, source.chassisLength);
+	}
+
 	public Car setInitialPosition(double x, double y) {
 		this.x = x;
 		this.y = y;
@@ -42,6 +46,11 @@ public final class Car {
 
 	public Car setInitialOrientation(double alpha) {
 		this.orientationAngle = convertTo2PISystem(alpha);
+		return this;
+	}
+
+	public Car setInitialOrientation(Vector orientation) {
+		this.orientationAngle = convertTo2PISystem(orientation.angle());
 		return this;
 	}
 

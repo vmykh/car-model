@@ -67,6 +67,8 @@ public class Main extends Application {
 
 //	private List<Obstacle> obstacles = new ArrayList();
 
+	private final CarMovementParameters carMovementParameters = new CarMovementParameters(CHASSIS_LENGTH * 1.15, PI / 7, PI / 7);
+
 	private Set<IntegerPoint> obstacleset = new HashSet<>();
 
 	private CopyOnWriteArrayList<List<Point>> intermediatePath = new CopyOnWriteArrayList<>();
@@ -155,8 +157,10 @@ public class Main extends Application {
 
 					executor.execute(() -> {
 						controls.set(new PathResolver(
-							target, collisionDetector, obstacleset, CANVAS_WIDTH, CANVAS_HEIGHT,
-								OBSTACLE_SIZE,  new IntermediatePathPainter()).resolvePath(car));
+								CANVAS_WIDTH, CANVAS_HEIGHT, obstacleset, OBSTACLE_SIZE, collisionDetector, car,
+								carMovementParameters, new IntermediatePathPainter()).resolvePath(
+								new PositionWithDirection(car.getBackAxleCenter(), car.getOrientationVector()),
+								target));
 						computingPathNow.set(false);
 
 
@@ -372,7 +376,7 @@ public class Main extends Application {
 
 							// TODO(vmykh): refactor this shit
 							int divider = 3;
-							double distance =  (1.25 * car.getChassisLength() / divider);
+							double distance =  (carMovementParameters.getUnitStepDistance() / divider);
 
 
 							if (currentMovement != null) {
@@ -381,22 +385,22 @@ public class Main extends Application {
 										car = car.withFrontAxisAngle(0.0).movedBy(distance);
 										break;
 									case FORWARD_LEFT:
-										car = car.withFrontAxisAngle(PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+										car = car.withFrontAxisAngle(carMovementParameters.getLeftSteeringAngle())
 												.movedBy(distance);
 										break;
 									case FORWARD_RIGHT:
-										car = car.withFrontAxisAngle(-PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+										car = car.withFrontAxisAngle(-carMovementParameters.getRightSteeringAngle())
 												.movedBy(distance);
 										break;
 									case BACKWARD:
 										car = car.withFrontAxisAngle(0.0).movedBy(-distance);
 										break;
 									case BACKWARD_LEFT:
-										car = car.withFrontAxisAngle(PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+										car = car.withFrontAxisAngle(carMovementParameters.getLeftSteeringAngle())
 												.movedBy(-distance);
 										break;
 									case BACKWARD_RIGHT:
-										car = car.withFrontAxisAngle(-PathResolver.FRONT_AXIS_ROTATION_ANGLE)
+										car = car.withFrontAxisAngle(-carMovementParameters.getRightSteeringAngle())
 												.movedBy(-distance);
 										break;
 								}
@@ -454,17 +458,17 @@ public class Main extends Application {
 
 								Car newCar;
 								if (leftKeyIsPressed) {
-									newCar = car.withFrontAxisAngle(PI / 8.0);
+									newCar = car.withFrontAxisAngle(carMovementParameters.getLeftSteeringAngle());
 								} else if (rightKeyIsPressed) {
-									newCar = car.withFrontAxisAngle(-PI / 8.0);
+									newCar = car.withFrontAxisAngle(-carMovementParameters.getRightSteeringAngle());
 								} else {
 									newCar = car.withFrontAxisAngle(0.0);
 								}
 
 								if (upKeyIsPressed) {
-									newCar = newCar.movedBy(5);
+									newCar = newCar.movedBy(carMovementParameters.getUnitStepDistance() * 0.33);
 								} else if (downKeyIsPressed) {
-									newCar = newCar.movedBy(-5);
+									newCar = newCar.movedBy(-carMovementParameters.getUnitStepDistance() * 0.33);
 								}
 
 								if (!collisionDetector.collides(newCar)) {
